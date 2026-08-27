@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test-build-deploy:
@@ -23,8 +23,18 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - name: Composer install
+      - name: Composer install and resolve lock
         run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Commit generated composer.lock
+        run: |
+          if [ -n "$(git status --porcelain composer.lock)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add composer.lock
+            git commit -m "chore: lock composer dependencies [skip ci]"
+            git push origin HEAD:main
+          fi
 
       - name: Setup Node.js CI
         uses: actions/setup-node@v4
@@ -46,6 +56,9 @@ jobs:
 
       - name: Tests
         run: php artisan test
+
+      - name: Install production dependencies only
+        run: composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
 
       - name: Prepare deployment artifact
         run: |
