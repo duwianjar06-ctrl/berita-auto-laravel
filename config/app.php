@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\ServiceProvider;
-
 return [
     'name' => env('APP_NAME', 'Berita Auto'),
     'env' => env('APP_ENV', 'production'),
@@ -14,6 +12,20 @@ return [
     'key' => env('APP_KEY'),
     'cipher' => 'AES-256-CBC',
     'maintenance' => ['driver' => 'file'],
-    'providers' => ServiceProvider::defaultProviders()->merge([])->toArray(),
+    'providers' => [
+        Illuminate\Cache\CacheServiceProvider::class,
+        Illuminate\Foundation\Providers\ConsoleSupportServiceProvider::class,
+        Illuminate\Cookie\CookieServiceProvider::class,
+        Illuminate\Database\DatabaseServiceProvider::class,
+        Illuminate\Encryption\EncryptionServiceProvider::class,
+        Illuminate\Filesystem\FilesystemServiceProvider::class,
+        Illuminate\Foundation\Providers\FoundationServiceProvider::class,
+        Illuminate\Pagination\PaginationServiceProvider::class,
+        Illuminate\Queue\QueueServiceProvider::class,
+        Illuminate\Session\SessionServiceProvider::class,
+        Illuminate\Translation\TranslationServiceProvider::class,
+        Illuminate\Validation\ValidationServiceProvider::class,
+        Illuminate\View\ViewServiceProvider::class,
+    ],
     'aliases' => [],
 ];
