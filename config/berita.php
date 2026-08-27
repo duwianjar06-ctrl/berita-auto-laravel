@@ -1,0 +1,20 @@
+<?php
+return [
+ 'automation_enabled'=>env('AUTOMATION_ENABLED',false),
+ 'instagram_preparation_enabled'=>env('INSTAGRAM_PREPARATION_ENABLED',false),
+ 'instagram_auto_publish'=>env('INSTAGRAM_AUTO_PUBLISH',false),
+ 'instagram_access_token'=>env('INSTAGRAM_ACCESS_TOKEN'),
+ 'instagram_user_id'=>env('INSTAGRAM_USER_ID'),
+ 'instagram_api_version'=>env('INSTAGRAM_API_VERSION','v26.0'),
+ 'gemini_api_key'=>env('GEMINI_API_KEY'),
+ 'gemini_model'=>env('GEMINI_MODEL','gemini-2.5-flash-lite'),
+ 'freshness_hours'=>(int)env('NEWS_FRESHNESS_HOURS',12),
+ 'instagram_ready_low_watermark'=>(int)env('INSTAGRAM_READY_LOW_WATERMARK',2),
+ 'instagram_ready_high_watermark'=>(int)env('INSTAGRAM_READY_HIGH_WATERMARK',5),
+ 'instagram_prepare_max'=>(int)env('INSTAGRAM_PREPARE_MAX',3),
+ 'instagram_publish_max'=>(int)env('INSTAGRAM_PUBLISH_MAX',1),
+ 'instagram_throttle_seconds'=>(int)env('INSTAGRAM_THROTTLE_SECONDS',300),
+ 'instagram_daily_quota'=>(int)env('INSTAGRAM_DAILY_QUOTA',20),
+ 'admin_emails'=>array_values(array_filter(array_map('trim',explode(',',(string)env('ADMIN_EMAILS',''))))),
+ 'cron_secret'=>env('CRON_SECRET'),
+];

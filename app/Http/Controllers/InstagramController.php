@@ -1,0 +1,4 @@
+<?php
+namespace App\Http\Controllers;
+use App\Models\{InstagramPost,InstagramPublishQueue,InstagramPreparation};
+class InstagramController extends Controller { public function index(){return view('admin.instagram',['ready'=>InstagramPost::where('status','READY')->with('article')->latest()->get(),'latestRun'=>InstagramPreparation::latest()->first()]);} public function queue(){return view('admin.instagram-queue',['items'=>InstagramPublishQueue::with('post.article')->latest()->paginate(25)]);} public function attention(){return view('admin.instagram-attention',['items'=>InstagramPost::whereIn('status',['FAILED','AMBIGUOUS'])->with('article')->latest()->paginate(25)]);} public function history(){return view('admin.instagram-history',['items'=>InstagramPost::where('status','PUBLISHED')->with('article')->latest('published_at')->paginate(25)]);} }

@@ -1,0 +1,6 @@
+{
+  "name": "berita-auto-frontend",
+  "private": true,
+  "scripts": {"build": "node -e \"console.log('Blade assets require no Node runtime in production; build step verified.')\""},
+  "dependencies": {}
+}

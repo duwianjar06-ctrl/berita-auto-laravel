@@ -1,0 +1,14 @@
+/vendor/
+.env
+.env.*
+!.env.example
+/public/build/
+/public/storage
+/storage/*.key
+/storage/framework/
+/storage/logs/
+.phpunit.result.cache
+.phpunit.cache
+/.idea
+/.vscode
+.DS_Store
