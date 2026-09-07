@@ -6,15 +6,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  test-build-deploy:
+  test-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -22,58 +21,74 @@ jobs:
           extensions: mbstring, xml, ctype, fileinfo, curl, pdo_mysql
           coverage: none
           tools: composer:v2
-
-      - name: Composer install and resolve lock
+      - name: Validate Composer
+        run: composer validate --strict
+      - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Commit generated composer.lock
-        run: |
-          if [ -n "$(git status --porcelain composer.lock)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add composer.lock
-            git commit -m "chore: lock composer dependencies [skip ci]"
-            git push origin HEAD:main
-          fi
-
       - name: Setup Node.js CI
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-
       - name: Node dependencies
         run: npm ci
-
       - name: Frontend build
         run: npm run build
-
-      - name: Laravel static checks
+      - name: Laravel checks
         run: |
           php artisan optimize:clear
-          php artisan view:cache
           php artisan route:list
-
+          php artisan schedule:list
       - name: Tests
         run: php artisan test
-
-      - name: Install production dependencies only
-        run: composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
-
-      - name: Prepare deployment artifact
+      - name: Clean Laravel generated manifests
         run: |
-          rm -rf .git tests
-          tar -czf ../berita-auto-laravel.tar.gz .
+          php artisan optimize:clear || true
+          rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/events.php
+      - name: Install production dependencies only
+        run: |
+          composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
+      - name: Verify production boot
+        run: |
+          php artisan package:discover --ansi
+          php artisan about
+          php artisan route:list
+          php artisan schedule:list
 
+  deploy:
+    needs: test-build
+    runs-on: ubuntu-latest
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER  }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME  }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD  }}
+      FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR  }}
+    if: ${{ env.FTP_SERVER != '' && env.FTP_USERNAME != '' && env.FTP_PASSWORD != '' && env.FTP_SERVER_DIR != ''  }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, fileinfo, curl, pdo_mysql
+          coverage: none
+          tools: composer:v2
+      - name: Install production dependencies
+        run: |
+          rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/events.php
+          composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
       - name: Deploy to Rumahweb over FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
+          server: ${{ secrets.FTP_SERVER  }}
+          username: ${{ secrets.FTP_USERNAME  }}
+          password: ${{ secrets.FTP_PASSWORD  }}
           protocol: ftps
           port: 21
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR  }}
           local-dir: ./
           exclude: |
             **/.git*/**
