@@ -46,8 +46,7 @@ jobs:
           php artisan optimize:clear || true
           rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/events.php
       - name: Install production dependencies only
-        run: |
-          composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
+        run: composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
       - name: Verify production boot
         run: |
           php artisan package:discover --ansi
@@ -57,15 +56,8 @@ jobs:
 
   deploy:
     needs: test-build
+    if: ${{ vars.RUMAHWEB_DEPLOY_ENABLED == 'true'  }}
     runs-on: ubuntu-latest
-    env:
-      FTP_SERVER: ${{ secrets.FTP_SERVER  }}
-      FTP_USERNAME: ${{ secrets.FTP_USERNAME  }}
-      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD  }}
-      FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR  }}
-    if: ${{ env.FTP_SERVER != '' && env.FTP_USERNAME != '' && env.FTP_PASSWORD != '' && env.FTP_SERVER_DIR != ''  }}
-    permissions:
-      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,6 +72,17 @@ jobs:
         run: |
           rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/events.php
           composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
+      - name: Verify Rumahweb secrets
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER  }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME  }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD  }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR  }}
+        run: |
+          test -n "$FTP_SERVER"
+          test -n "$FTP_USERNAME"
+          test -n "$FTP_PASSWORD"
+          test -n "$FTP_SERVER_DIR"
       - name: Deploy to Rumahweb over FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
