@@ -1,6 +1,8 @@
 {
   "name": "duwianjar06-ctrl/berita-auto-laravel",
+  "description": "Berita Auto Laravel application",
   "type": "project",
+  "license": "proprietary",
   "require": {
     "php": "^8.2",
     "laravel/framework": "^12.0",
