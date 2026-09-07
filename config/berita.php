@@ -1,2 +1,25 @@
 <?php
-return ['automation_enabled'=>env('AUTOMATION_ENABLED',false)];
+return [
+ 'automation_enabled'=>env('AUTOMATION_ENABLED',false),
+ 'instagram_preparation_enabled'=>env('INSTAGRAM_PREPARATION_ENABLED',false),
+ 'instagram_auto_publish'=>env('INSTAGRAM_AUTO_PUBLISH',false),
+ 'instagram_access_token'=>env('INSTAGRAM_ACCESS_TOKEN'),
+ 'instagram_user_id'=>env('INSTAGRAM_USER_ID'),
+ 'instagram_api_version'=>env('INSTAGRAM_API_VERSION','v26.0'),
+ 'gemini_api_key'=>env('GEMINI_API_KEY'),
+ 'gemini_model'=>env('GEMINI_MODEL','gemini-2.5-flash-lite'),
+ 'freshness_hours'=>(int)env('NEWS_FRESHNESS_HOURS',12),
+ 'news_publish_target'=>(int)env('NEWS_PUBLISH_TARGET',2),
+ 'news_candidate_scan_max'=>(int)env('NEWS_CANDIDATE_SCAN_MAX',10),
+ 'news_min_source_chars'=>(int)env('NEWS_MIN_SOURCE_CHARS',1000),
+ 'news_min_quality_score'=>(int)env('NEWS_MIN_QUALITY_SCORE',75),
+ 'news_max_generation_attempts'=>(int)env('NEWS_MAX_GENERATION_ATTEMPTS',3),
+ 'instagram_ready_low_watermark'=>(int)env('INSTAGRAM_READY_LOW_WATERMARK',2),
+ 'instagram_ready_high_watermark'=>(int)env('INSTAGRAM_READY_HIGH_WATERMARK',5),
+ 'instagram_prepare_max'=>(int)env('INSTAGRAM_PREPARE_MAX',3),
+ 'instagram_publish_max'=>(int)env('INSTAGRAM_PUBLISH_MAX',1),
+ 'instagram_throttle_seconds'=>(int)env('INSTAGRAM_THROTTLE_SECONDS',300),
+ 'instagram_daily_quota'=>(int)env('INSTAGRAM_DAILY_QUOTA',20),
+ 'admin_emails'=>array_values(array_filter(array_map('trim',explode(',',(string)env('ADMIN_EMAILS',''))))),
+ 'cron_secret'=>env('CRON_SECRET'),
+];
