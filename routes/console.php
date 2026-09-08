@@ -1,13 +1,7 @@
 <?php
-
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
-
-Artisan::command('berita:cycle', function () {
-    $this->call('berita:ingest');
-    $this->call('berita:publish');
-})->purpose('Run the news ingestion and publishing cycle');
-
+use Illuminate\Support\Facades\Artisan;
+Artisan::command('berita:cycle',function(){$this->call('berita:ingest');$this->call('berita:publish');})->purpose('Run news ingestion and bounded publishing cycle');
 Schedule::command('berita:cycle')->everyFifteenMinutes()->withoutOverlapping(20);
 Schedule::command('berita:instagram-prepare')->everyFifteenMinutes()->withoutOverlapping(20);
 Schedule::command('berita:instagram-publish')->everyFifteenMinutes()->withoutOverlapping(20);
