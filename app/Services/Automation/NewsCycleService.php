@@ -10,7 +10,7 @@ class NewsCycleService {
   $lock=AutomationLock::firstOrCreate(['name'=>'news_cycle']);
   if($lock->expires_at&&$lock->expires_at->isFuture())return ['status'=>'locked'];
   $owner=(string)Str::uuid();$lock->update(['owner'=>$owner,'expires_at'=>now()->addMinutes(10)]);
-  $started=microtime(true);$run=null;$t=array_fill_keys(['sources_checked','sources_failed','rss_items_seen','new_candidates','duplicates_skipped','candidates_scanned','source_fetch_success','source_fetch_failed','generated_ai','generated_fallback','generation_failed','quality_pass','quality_failed','published','rejected','deferred'],0);$err=null;
+  $started=microtime(true);$run=null;$status='failed';$t=array_fill_keys(['sources_checked','sources_failed','rss_items_seen','new_candidates','duplicates_skipped','candidates_scanned','source_fetch_success','source_fetch_failed','generated_ai','generated_fallback','generation_failed','quality_pass','quality_failed','published','rejected','deferred'],0);$err=null;
   try{
    $run=AutomationRun::create(['run_uuid'=>$owner,'type'=>'news_cycle','trigger'=>'scheduler','status'=>'running','target'=>(int)config('berita.news_publish_target',2),'started_at'=>now(),'telemetry'=>[]]);
    $ing=app(NewsIngestionService::class)->run();foreach(['sources_checked','sources_failed','rss_items_seen','new_candidates','duplicates_skipped'] as $k)$t[$k]=(int)($ing[$k]??0);
@@ -19,6 +19,5 @@ class NewsCycleService {
   }catch(\\Throwable $e){$status='failed';$err=substr($e->getMessage(),0,1000);}
   finally{$t['duration_ms']=(int)round((microtime(true)-$started)*1000);if($run)$run->update(['status'=>$status,'processed'=>$t['published'],'telemetry'=>$t,'last_error'=>$err,'finished_at'=>now()]);$lock->refresh();if($lock->owner===$owner)$lock->update(['owner'=>null,'expires_at'=>now()]);}
   return ['status'=>$status,'run_id'=>$owner,'telemetry'=>$t,'last_error'=>$err];
- }
  }
 }
