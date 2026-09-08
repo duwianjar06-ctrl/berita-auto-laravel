@@ -1,11 +1,12 @@
 <?php
 namespace Tests\Unit;
 use Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Models\Article;
 use App\Services\Articles\ArticleGenerationService;
 use App\Services\News\NewsIngestionService;
 use App\Services\Articles\ArticleQualityGate;
-class NewsSafetyTest extends TestCase {
+class NewsSafetyTest extends TestCase { use RefreshDatabase;
  private function invoke(object $o,string $m,array $args=[]):mixed{$r=new \ReflectionMethod($o,$m);$r->setAccessible(true);return $r->invokeArgs($o,$args);}
  public function test_generation_fallback_uses_full_source():void{config(['berita.gemini_api_key'=>null]);$a=new Article(['title'=>'Judul','excerpt'=>'ringkas','source_content'=>str_repeat('Fakta sumber. ',100)]);$g=$this->invoke(app(ArticleGenerationService::class),'generate',[$a]);$this->assertSame(str_repeat('Fakta sumber. ',100),$a->source_content);$this->assertNotEmpty($g['data']['content']);}
  public function test_unsupported_number_is_detected():void{$a=new Article(['title'=>'Judul','excerpt'=>'','source_content'=>'Harga Rp 10 juta.']);$g=$this->invoke(app(ArticleGenerationService::class),'safe',[['title'=>'Judul','excerpt'=>'','content'=>'Harga Rp 20 juta.'],$a]);$this->assertFalse($g['pass']);$this->assertStringContainsString('unsupported_number',$g['reasons'][0]);}
