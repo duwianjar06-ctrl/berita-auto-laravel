@@ -1,0 +1,20 @@
+<?php
+namespace App\Services\Articles;
+use Illuminate\Support\Facades\Http;
+class SourceArticleExtractor{
+ public function extract(string $url,?string $rss=null):array{
+  $start=microtime(true);$base=['text'=>'','method'=>null,'char_count'=>0,'word_count'=>0,'status'=>'failed','duration_ms'=>0];
+  if(!in_array(strtolower((string)parse_url($url,PHP_URL_SCHEME)),['http','https'],true))return $this->finish($base,'invalid_url',$start);
+  try{$r=Http::connectTimeout(4)->timeout(8)->withHeaders(['Accept'=>'text/html','User-Agent'=>'BeritaAutoBot/1.0'])->withOptions(['allow_redirects'=>['max'=>3,'strict'=>true]])->get($url);
+   $ct=strtolower((string)$r->header('Content-Type'));if(!$r->successful()||($ct&&!str_contains($ct,'text/html')&&!str_contains($ct,'application/xhtml+xml')))return $this->fallback($base,$rss,'fetch_failed',$start);
+   $body=substr($r->body(),0,3*1024*1024);$d=new \DOMDocument();libxml_use_internal_errors(true);$d->loadHTML('<?xml encoding="UTF-8">'.$body,LIBXML_NOWARNING|LIBXML_NOERROR);$x=new \DOMXPath($d);
+   foreach($x->query('//script[@type="application/ld+json"]')?:[] as $n){$j=json_decode(trim($n->textContent),true);foreach($this->jsonBodies($j) as $v)if(mb_strlen($v)>=200)return $this->finish($base,'json_ld',$start,$v);}
+   foreach(['//article'=>'article','//main'=>'main','//*[contains(concat(" ",normalize-space(@class)," "), " article-content ") or contains(concat(" ",normalize-space(@class)," "), " article-body ") or contains(concat(" ",normalize-space(@class)," "), " entry-content ") or contains(concat(" ",normalize-space(@class)," "), " post-content ") or contains(concat(" ",normalize-space(@class)," "), " detail-content ") ]'=>'selector'] as $q=>$method){$ns=$x->query($q);if($ns&&$ns->length){$v=$this->clean($ns->item(0));if(mb_strlen($v)>=200)return $this->finish($base,$method,$start,$v);}}
+   return $this->fallback($base,$rss,'no_content',$start);
+  }catch(\Throwable){return $this->fallback($base,$rss,'timeout_or_error',$start);}
+ }
+ private function jsonBodies($j):array{$out=[];if(!is_array($j))return $out;if(isset($j['articleBody'])&&is_string($j['articleBody']))$out[]=$j['articleBody'];foreach(($j['@graph']??[]) as $v)if(is_array($v)&&isset($v['articleBody']))$out[]=(string)$v['articleBody'];return $out;}
+ private function clean(\DOMNode $node):string{$c=$node->cloneNode(true);$x=new \DOMXPath($c instanceof \DOMDocument?$c:$c->ownerDocument);foreach($x->query('//script|//style|//nav|//footer|//aside|//form|//menu|//*[contains(translate(@class,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"advert") or contains(translate(@class,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"related") or contains(translate(@class,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"recommend") or contains(translate(@class,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"newsletter") or contains(translate(@class,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"social-share") or contains(translate(@class,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz"),"comment")]')?:[] as $n)$n->parentNode?->removeChild($n);return trim((string)preg_replace('/\s+/u',' ',$c->textContent));}
+ private function fallback(array $b,?string $rss,string $status,float $start):array{$t=trim(strip_tags((string)$rss));return mb_strlen($t)>=200?$this->finish($b,'rss_fallback',$start,$t):$this->finish($b,$status,$start);}
+ private function finish(array $b,string $method,float $start,string $text=''):array{$text=trim((string)preg_replace('/\s+/u',' ',$text));$b['text']=$text;$b['method']=$method;$b['char_count']=mb_strlen($text);$b['word_count']=$text?count(preg_split('/\s+/u',$text)):0;$b['status']=str_starts_with($method,'ok')||in_array($method,['json_ld','article','main','selector','rss_fallback'],true)?'ok':$method;$b['duration_ms']=(int)round((microtime(true)-$start)*1000);return $b;}
+}
