@@ -1,9 +1,9 @@
 <?php
 namespace App\Services\Articles;
 use App\Models\Article;
-class ArticleQualityGate {
+class ArticleQualityGate { private $duplicateResolver; public function __construct(?callable $duplicateResolver=null){$this->duplicateResolver=$duplicateResolver;}
  public function check(Article $a, ?array $safety=null): array {
-  $reasons=[];$score=0;$title=trim((string)$a->title);$excerpt=trim((string)$a->excerpt);$content=trim(strip_tags((string)$a->content));$source=trim((string)($a->source_content?:$a->content));$fp=(string)$a->fingerprint;$tfp=hash('sha256',preg_replace('/\\s+/',' ',mb_strtolower($title)));$dup=Article::where(function($q)use($fp,$tfp){$q->where('fingerprint',$fp)->orWhere('title_fingerprint',$tfp);})->whereKeyNot($a->id)->exists();
+  $reasons=[];$score=0;$title=trim((string)$a->title);$excerpt=trim((string)$a->excerpt);$content=trim(strip_tags((string)$a->content));$source=trim((string)($a->source_content?:$a->content));$fp=(string)$a->fingerprint;$tfp=hash('sha256',preg_replace('/\\s+/',' ',mb_strtolower($title)));$dup=$this->duplicateResolver ? (bool)($this->duplicateResolver)($a,$fp,$tfp) : Article::where(function($q)use($fp,$tfp){$q->where('fingerprint',$fp)->orWhere('title_fingerprint',$tfp);})->whereKeyNot($a->id)->exists();
   if($title!=='')$score+=10;else $reasons[]='empty_title';
   if($excerpt!=='')$score+=10;else $reasons[]='empty_excerpt';
   if(mb_strlen($content)>=500)$score+=20;elseif(mb_strlen($content)>=250)$score+=10;else $reasons[]='content_too_short';
