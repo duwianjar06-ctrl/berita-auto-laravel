@@ -26,4 +26,11 @@ class ArticleGenerationService {
  private function overlap(string $a,string $b):float{$na=preg_split('/\W+/u',mb_strtolower($a),-1,PREG_SPLIT_NO_EMPTY);$nb=array_flip(preg_split('/\W+/u',mb_strtolower($b),-1,PREG_SPLIT_NO_EMPTY));if(!$na)return 0;$hit=0;foreach($na as $w)if(isset($nb[$w]))$hit++;return $hit/count($na);}
  private function fallbackContent(string $s):string{$p=preg_split('/(?<=[.!?])\s+/u',trim(strip_tags($s)),-1,PREG_SPLIT_NO_EMPTY);$p=array_values(array_unique(array_filter($p)));return implode("\n\n",array_slice($p,0,10));}
  private function discoverImage(?string $url):?string{if(!$url)return null;try{$r=Http::connectTimeout(3)->timeout(5)->withHeaders(['Accept'=>'text/html','User-Agent'=>'BeritaAutoBot/1.0'])->get($url);if(!$r->successful())return null;preg_match('/<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)/i',$r->body(),$m);return isset($m[1])&&filter_var($m[1],FILTER_VALIDATE_URL)?$m[1]:null;}catch(\Throwable){return null;}}
+ private function fallbackResult(array $fallback, Article $a, string $reason): array {
+  $safety=$this->safe($fallback,$a);
+  $minimum=mb_strlen(trim((string)($fallback['content']??'')))>=250;
+  $valid=$safety['pass'] && $minimum;
+  $transient=in_array($reason,['gemini_transient','gemini_timeout'],true)&&!$valid;
+  return ['pass'=>$valid,'transient'=>$transient,'reason'=>$valid?'':$reason,'data'=>$fallback,'safety'=>$safety,'mode'=>'fallback'];
+ }
 }
