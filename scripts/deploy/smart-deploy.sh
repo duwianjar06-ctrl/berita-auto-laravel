@@ -67,7 +67,28 @@ remote_rm() {
 
 remote_mkdir() {
     local remote="$1"
-    lftp_common "mkdir -p \"$remote\""
+
+    # Probe first with normal error handling. An existing directory is success;
+    # all other failures are passed to a strict mkdir operation and remain fatal.
+    if lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<EOF2
+set cmd:fail-exit yes
+set ftp:ssl-force true
+set ftp:ssl-protect-data true
+set ftp:passive-mode true
+set net:timeout 30
+set net:max-retries 10
+set net:reconnect-interval-base 5
+set net:reconnect-interval-max 30
+cd "$remote"
+bye
+EOF2
+    then
+        return 0
+    fi
+
+    # mkdir is attempted only when the probe could not enter the directory.
+    # Permission, authentication, connection, and other FTP errors stay fatal.
+    lftp_common "mkdir \"$remote\""
 }
 
 safe_path() {
@@ -241,6 +262,8 @@ PY
     fi
 fi
 
+# The initial branch already creates .deploy. The idempotent probe also makes
+# this safe for recovery runs where the directory exists but state files do not.
 remote_mkdir "$BASE/.deploy"
 if [[ -f "$NEW_MANIFEST" ]]; then
     remote_put "$NEW_MANIFEST" "$BASE/.deploy"
