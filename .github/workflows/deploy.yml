@@ -1,4 +1,4 @@
-name: Deploy production
+name: Deploy Production
 
 on:
   push:
@@ -8,72 +8,97 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   test-build:
+    name: Test & Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout full history
         uses: actions/checkout@v4
-      - name: Setup PHP
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: mbstring, xml, ctype, fileinfo, curl, pdo_mysql
           coverage: none
           tools: composer:v2
+
       - name: Validate Composer
         run: composer validate --strict
+
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Setup Node.js CI
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - name: Node dependencies
-        run: npm ci
-      - name: Frontend build
-        run: npm run build
+
+      - name: Verify Laravel public entrypoint
+        run: |
+          test -f public/index.php
+          test -f public/.htaccess
+          test -f public/robots.txt
+
       - name: Laravel checks
         run: |
           php artisan optimize:clear
-          php artisan route:list
-          php artisan schedule:list
-      - name: Tests
-        run: php artisan test
-      - name: Clean Laravel generated manifests
-        run: |
-          php artisan optimize:clear || true
-          rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/events.php
-      - name: Install production dependencies only
-        run: composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
-      - name: Verify production boot
-        run: |
-          php artisan package:discover --ansi
           php artisan about
           php artisan route:list
           php artisan schedule:list
 
+      - name: Tests
+        run: php artisan test
+
+      - name: Frontend dependency/build check
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
   deploy:
+    name: Smart FTPS Deploy
     needs: test-build
     if: ${{ github.event_name == 'workflow_dispatch' || vars.RUMAHWEB_DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Checkout
+      - name: Checkout full history
         uses: actions/checkout@v4
-      - name: Setup PHP
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: mbstring, xml, ctype, fileinfo, curl, pdo_mysql
           coverage: none
           tools: composer:v2
-      - name: Install production dependencies
+
+      - name: Install production Composer dependencies
         run: |
           rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/events.php
           composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
-      - name: Verify Rumahweb secrets
+
+      - name: Prepare frontend assets
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build frontend assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Validate deployment helper
+        run: bash -n scripts/deploy/smart-deploy.sh
+
+      - name: Verify Rumahweb secrets are present
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
@@ -84,36 +109,17 @@ jobs:
           test -n "$FTP_USERNAME"
           test -n "$FTP_PASSWORD"
           test -n "$FTP_SERVER_DIR"
+
       - name: Install lftp
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
-      - name: Deploy to Rumahweb with resilient FTPS
+
+      - name: Run smart resumable deployment
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
-        run: |
-          set -euo pipefail
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<EOF
-          set cmd:fail-exit yes
-          set ftp:ssl-force true
-          set ftp:ssl-protect-data true
-          set ftp:passive-mode true
-          set net:timeout 30
-          set net:max-retries 30
-          set net:reconnect-interval-base 5
-          set net:reconnect-interval-max 30
-          set mirror:use-pget-n 1
-          set xfer:clobber true
-          mirror --reverse --continue --parallel=1 --verbose \
-            --exclude-glob ".git/**" \
-            --exclude-glob ".github/**" \
-            --exclude-glob ".env" \
-            --exclude-glob ".env.*" \
-            --exclude-glob "tests/**" \
-            --exclude-glob "storage/logs/**" \
-            ./ "$FTP_SERVER_DIR"
-          bye
-          EOF
+          GITHUB_SHA: ${{ github.sha }}
+        run: bash scripts/deploy/smart-deploy.sh
