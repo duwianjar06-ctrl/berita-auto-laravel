@@ -58,6 +58,7 @@ jobs:
     needs: test-build
     if: ${{ github.event_name == 'workflow_dispatch' || vars.RUMAHWEB_DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,27 +75,45 @@ jobs:
           composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
       - name: Verify Rumahweb secrets
         env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER  }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME  }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD  }}
-          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR  }}
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
           test -n "$FTP_SERVER"
           test -n "$FTP_USERNAME"
           test -n "$FTP_PASSWORD"
           test -n "$FTP_SERVER_DIR"
-      - name: Deploy to Rumahweb over FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ secrets.FTP_SERVER  }}
-          username: ${{ secrets.FTP_USERNAME  }}
-          password: ${{ secrets.FTP_PASSWORD  }}
-          protocol: ftps
-          port: 21
-          server-dir: ${{ secrets.FTP_SERVER_DIR  }}
-          local-dir: ./
-          exclude: |
-            **/.git*/**
-            **/.env*
-            **/tests/**
-            **/storage/logs/**
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+      - name: Deploy to Rumahweb with resilient FTPS
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          set -euo pipefail
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<EOF
+          set cmd:fail-exit yes
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ftp:passive-mode true
+          set net:timeout 30
+          set net:max-retries 30
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 30
+          set mirror:use-pget-n 1
+          set xfer:clobber true
+          mirror --reverse --continue --parallel=1 --verbose \
+            --exclude-glob ".git/**" \
+            --exclude-glob ".github/**" \
+            --exclude-glob ".env" \
+            --exclude-glob ".env.*" \
+            --exclude-glob "tests/**" \
+            --exclude-glob "storage/logs/**" \
+            ./ "$FTP_SERVER_DIR"
+          bye
+          EOF
