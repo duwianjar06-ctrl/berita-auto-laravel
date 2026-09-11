@@ -63,7 +63,6 @@ jobs:
   deploy:
     name: Smart FTPS Deploy
     needs: test-build
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.RUMAHWEB_DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
