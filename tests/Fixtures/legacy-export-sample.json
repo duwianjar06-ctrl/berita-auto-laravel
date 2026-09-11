@@ -1,0 +1,19 @@
+{
+  "articles": [
+    {
+      "title": "Berita Auto Fixture",
+      "slug": "berita-auto-fixture",
+      "category": "Otomotif",
+      "sourceUrl": "https://example.com/berita-auto-fixture",
+      "sourceName": "Fixture News",
+      "publisher": "Fixture Publisher",
+      "imageUrl": "https://example.com/fixture.jpg",
+      "imageAlt": "Ilustrasi berita fixture",
+      "excerpt": "Fixture untuk menguji jalur migrasi legacy.",
+      "content": "Isi artikel fixture.",
+      "publishedAt": "2026-09-01T08:30:00+07:00",
+      "generationStatus": "published",
+      "fingerprint": "fixture-fingerprint-001"
+    }
+  ]
+}
