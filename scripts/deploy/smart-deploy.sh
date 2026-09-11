@@ -57,7 +57,18 @@ EOF2
 
 remote_put() {
     local local_file="$1" remote_dir="$2"
-    lftp_common "put \"$local_file\" -O \"$remote_dir\""
+
+    [[ -f "$local_file" ]] || {
+        echo "Local upload file not found: $local_file" >&2
+        return 1
+    }
+
+    [[ -n "$remote_dir" ]] || {
+        echo "Remote upload directory is required" >&2
+        return 1
+    }
+
+    lftp_common "put -O \"$remote_dir\" \"$local_file\""
 }
 
 remote_rm() {
