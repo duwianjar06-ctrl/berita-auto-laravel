@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+    @php($articleItems = collect($articles->items()))
     <header class="border-b-2 border-slate-900 pb-5">
         <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Kategori</p>
         <h1 class="mt-2 text-3xl font-black tracking-tight sm:text-5xl">{{ $cat->name }}</h1>
@@ -9,8 +10,8 @@
 
     <section class="mt-7" aria-labelledby="category-news-heading">
         <h2 id="category-news-heading" class="sr-only">Berita terbaru {{ $cat->name }}</h2>
-        @if($articles->count())
-            @php($featured = $articles->first())
+        @if($articleItems->isNotEmpty())
+            @php($featured = $articleItems->first())
             <article class="grid gap-6 border-b border-slate-200 pb-7 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.9fr)]">
                 @if($featured->image_url)
                     <a href="{{ route('article', $featured->slug) }}" class="block aspect-[16/9] overflow-hidden bg-slate-100">
@@ -26,7 +27,7 @@
             </article>
 
             <div class="mt-2 divide-y divide-slate-200">
-                @foreach($articles->slice(1) as $article)
+                @foreach($articleItems->slice(1) as $article)
                     <article class="grid gap-4 py-5 sm:grid-cols-[180px_minmax(0,1fr)]">
                         @if($article->image_url)
                             <a href="{{ route('article', $article->slug) }}" class="block aspect-[4/3] overflow-hidden bg-slate-100">
@@ -48,8 +49,6 @@
             <div class="border border-slate-200 bg-white p-6 text-sm text-slate-500">Belum ada berita pada kategori ini.</div>
         @endif
 
-        @if(method_exists($articles, 'links'))
-            <div class="mt-6 border-t border-slate-200 pt-5">{{ $articles->links() }}</div>
-        @endif
+        @if(method_exists($articles, 'links'))<div class="mt-6 border-t border-slate-200 pt-5">{{ $articles->links() }}</div>@endif
     </section>
 @endsection
