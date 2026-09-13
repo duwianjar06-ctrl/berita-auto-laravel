@@ -113,14 +113,16 @@ jobs:
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
           GITHUB_SHA: ${{ github.sha }}
         run: bash scripts/deploy/smart-deploy.sh
-      - name: Remove compiled production Blade views
+      - name: Force upload home Blade and clean compiled views
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
           set -euo pipefail
+          test -f "$GITHUB_WORKSPACE/resources/views/home.blade.php"
           lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
           set cmd:fail-exit yes
           set ftp:ssl-force true
@@ -131,17 +133,23 @@ jobs:
           set net:reconnect-interval-base 5
           set net:reconnect-interval-max 30
           cd "$FTP_SERVER_DIR"
+          put -O resources/views "$GITHUB_WORKSPACE/resources/views/home.blade.php"
           glob -a rm -f storage/framework/views/*.php
           bye
           LFTP
-      - name: Verify deployed home Blade exists
+          echo "FORCE_UPLOAD_HOME_BLADE: SUCCESS"
+          echo "BLADE_CACHE_CLEANUP: SUCCESS"
+      - name: Verify production home Blade checksum
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
           set -euo pipefail
+          repo_sha="$(sha256sum "$GITHUB_WORKSPACE/resources/views/home.blade.php" | awk '{print $1}')"
+          rm -f "$GITHUB_WORKSPACE/remote-home.blade.php"
           lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
           set cmd:fail-exit yes
           set ftp:ssl-force true
@@ -152,6 +160,21 @@ jobs:
           set net:reconnect-interval-base 5
           set net:reconnect-interval-max 30
           cd "$FTP_SERVER_DIR"
-          cls -1 resources/views/home.blade.php
+          get -o "$GITHUB_WORKSPACE/remote-home.blade.php" resources/views/home.blade.php
           bye
           LFTP
+          remote_sha="$(sha256sum "$GITHUB_WORKSPACE/remote-home.blade.php" | awk '{print $1}')"
+          echo "REPOSITORY_HOME_BLADE_SHA256: $repo_sha"
+          echo "REMOTE_HOME_BLADE_SHA256: $remote_sha"
+          if [[ "$repo_sha" != "$remote_sha" ]]; then
+            echo "REMOTE_HOME_BLADE_CHECKSUM_MATCH: NO"
+            exit 1
+          fi
+          echo "REMOTE_HOME_BLADE_CHECKSUM_MATCH: YES"
+      - name: Production HTTP health check
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 60 https://beritaauto.site/)"
+          echo "PRODUCTION_HTTP_STATUS: $status"
+          test "$status" = "200"
+          echo "PRODUCTION_HEALTH: PASS"
