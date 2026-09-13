@@ -42,9 +42,15 @@ jobs:
           test -f public/.htaccess
           test -f public/robots.txt
 
+      - name: Validate PHP and Blade templates
+        run: |
+          php -l app/Http/Controllers/PublicController.php
+          php artisan optimize:clear
+          php artisan view:cache
+          php artisan view:clear
+
       - name: Laravel checks
         run: |
-          php artisan optimize:clear
           php artisan about
           php artisan route:list
           php artisan schedule:list
@@ -122,3 +128,43 @@ jobs:
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
           GITHUB_SHA: ${{ github.sha }}
         run: bash scripts/deploy/smart-deploy.sh
+
+      - name: Remove compiled production Blade views
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          set -euo pipefail
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "ftps://$FTP_SERVER:21" <<LFTP
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ftp:passive-mode true
+          set net:max-retries 3
+          set net:timeout 30
+          set cmd:fail-exit yes
+          cd "$FTP_SERVER_DIR"
+          glob -a rm -f storage/framework/views/*.php
+          bye
+          LFTP
+
+      - name: Verify deployed home Blade exists
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          set -euo pipefail
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "ftps://$FTP_SERVER:21" <<LFTP
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ftp:passive-mode true
+          set net:max-retries 3
+          set net:timeout 30
+          set cmd:fail-exit yes
+          cd "$FTP_SERVER_DIR"
+          cls -1 resources/views/home.blade.php
+          bye
+          LFTP
