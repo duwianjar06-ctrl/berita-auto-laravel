@@ -21,7 +21,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
@@ -29,35 +28,28 @@ jobs:
           extensions: mbstring, xml, ctype, fileinfo, curl, pdo_mysql
           coverage: none
           tools: composer:v2
-
       - name: Validate Composer
         run: composer validate --strict
-
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
-
       - name: Verify Laravel public entrypoint
         run: |
           test -f public/index.php
           test -f public/.htaccess
           test -f public/robots.txt
-
       - name: Validate PHP and Blade templates
         run: |
           php -l app/Http/Controllers/PublicController.php
           php artisan optimize:clear
           php artisan view:cache
           php artisan view:clear
-
       - name: Laravel checks
         run: |
           php artisan about
           php artisan route:list
           php artisan schedule:list
-
       - name: Tests
         run: php artisan test
-
       - name: Frontend dependency/build check
         uses: actions/setup-node@v4
         with:
@@ -76,7 +68,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
@@ -84,12 +75,10 @@ jobs:
           extensions: mbstring, xml, ctype, fileinfo, curl, pdo_mysql
           coverage: none
           tools: composer:v2
-
       - name: Install production Composer dependencies
         run: |
           rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/events.php
           composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
-
       - name: Prepare frontend assets
         uses: actions/setup-node@v4
         with:
@@ -99,10 +88,8 @@ jobs:
         run: |
           npm ci
           npm run build
-
       - name: Validate deployment helper
         run: bash -n scripts/deploy/smart-deploy.sh
-
       - name: Verify Rumahweb secrets are present
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -114,12 +101,10 @@ jobs:
           test -n "$FTP_USERNAME"
           test -n "$FTP_PASSWORD"
           test -n "$FTP_SERVER_DIR"
-
       - name: Install lftp
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
-
       - name: Run smart resumable deployment
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -128,7 +113,6 @@ jobs:
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
           GITHUB_SHA: ${{ github.sha }}
         run: bash scripts/deploy/smart-deploy.sh
-
       - name: Remove compiled production Blade views
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -137,18 +121,19 @@ jobs:
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
           set -euo pipefail
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "ftps://$FTP_SERVER:21" <<LFTP
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
+          set cmd:fail-exit yes
           set ftp:ssl-force true
           set ftp:ssl-protect-data true
           set ftp:passive-mode true
-          set net:max-retries 3
+          set net:max-retries 30
           set net:timeout 30
-          set cmd:fail-exit yes
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 30
           cd "$FTP_SERVER_DIR"
           glob -a rm -f storage/framework/views/*.php
           bye
           LFTP
-
       - name: Verify deployed home Blade exists
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -157,13 +142,15 @@ jobs:
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
           set -euo pipefail
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "ftps://$FTP_SERVER:21" <<LFTP
+          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
+          set cmd:fail-exit yes
           set ftp:ssl-force true
           set ftp:ssl-protect-data true
           set ftp:passive-mode true
-          set net:max-retries 3
+          set net:max-retries 30
           set net:timeout 30
-          set cmd:fail-exit yes
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 30
           cd "$FTP_SERVER_DIR"
           cls -1 resources/views/home.blade.php
           bye
