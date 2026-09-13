@@ -113,7 +113,7 @@ jobs:
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
           GITHUB_SHA: ${{ github.sha }}
         run: bash scripts/deploy/smart-deploy.sh
-      - name: Force upload home Blade and clean compiled views
+      - name: Force upload canonical Blade views and clean compiled views
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
@@ -123,6 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f "$GITHUB_WORKSPACE/resources/views/home.blade.php"
+          test -f "$GITHUB_WORKSPACE/resources/views/layouts/app.blade.php"
           lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
           set cmd:fail-exit yes
           set ftp:ssl-force true
@@ -134,10 +135,12 @@ jobs:
           set net:reconnect-interval-max 30
           cd "$FTP_SERVER_DIR"
           put -O resources/views "$GITHUB_WORKSPACE/resources/views/home.blade.php"
+          put -O resources/views/layouts "$GITHUB_WORKSPACE/resources/views/layouts/app.blade.php"
           glob -a rm -f storage/framework/views/*.php
           bye
           LFTP
           echo "FORCE_UPLOAD_HOME_BLADE: SUCCESS"
+          echo "FORCE_UPLOAD_APP_LAYOUT: SUCCESS"
           echo "BLADE_CACHE_CLEANUP: SUCCESS"
       - name: Verify production home Blade checksum
         env:
@@ -162,10 +165,10 @@ jobs:
           set net:reconnect-interval-max 30
           cd "$FTP_SERVER_DIR"
           lcd "$GITHUB_WORKSPACE/remote-download"
-          get resources/views/home.blade.php -o remote-home.blade.php
+          get resources/views/home.blade.php
           bye
           LFTP
-          cp "$GITHUB_WORKSPACE/remote-download/remote-home.blade.php" "$GITHUB_WORKSPACE/remote-home.blade.php"
+          mv "$GITHUB_WORKSPACE/remote-download/home.blade.php" "$GITHUB_WORKSPACE/remote-home.blade.php"
           remote_sha="$(sha256sum "$GITHUB_WORKSPACE/remote-home.blade.php" | awk '{print $1}')"
           echo "REPOSITORY_HOME_BLADE_SHA256: $repo_sha"
           echo "REMOTE_HOME_BLADE_SHA256: $remote_sha"
