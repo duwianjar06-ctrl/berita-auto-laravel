@@ -21,7 +21,9 @@
                 <div class="self-center">
                     <p class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $cat->name }}</p>
                     <h3 class="mt-2 text-2xl font-black leading-tight tracking-tight sm:text-4xl"><a href="{{ route('article', $featured->slug) }}" class="hover:underline decoration-2 underline-offset-4">{{ $featured->title }}</a></h3>
-                    @if($featured->excerpt)<p class="mt-3 text-sm leading-7 text-slate-600 sm:text-base">{{ $featured->excerpt }}</p>@endif
+                    @if($featured->excerpt)
+                        <p class="mt-3 text-sm leading-7 text-slate-600 sm:text-base">{{ $featured->excerpt }}</p>
+                    @endif
                     <time class="mt-4 block text-xs text-slate-500" datetime="{{ optional($featured->site_published_at)->toAtomString() }}">{{ optional($featured->site_published_at)->format('d M Y H:i') }}</time>
                 </div>
             </article>
@@ -36,11 +38,14 @@
                         @endif
                         <div>
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <span>{{ $cat->name }}</span><span aria-hidden="true">·</span>
+                                <span>{{ $cat->name }}</span>
+                                <span aria-hidden="true">·</span>
                                 <time datetime="{{ optional($article->site_published_at)->toAtomString() }}">{{ optional($article->site_published_at)->format('d M Y H:i') }}</time>
                             </div>
                             <h3 class="mt-1 text-xl font-extrabold leading-snug sm:text-2xl"><a href="{{ route('article', $article->slug) }}" class="hover:underline decoration-2 underline-offset-4">{{ $article->title }}</a></h3>
-                            @if($article->excerpt)<p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{{ $article->excerpt }}</p>@endif
+                            @if($article->excerpt)
+                                <p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{{ $article->excerpt }}</p>
+                            @endif
                         </div>
                     </article>
                 @endforeach
@@ -49,6 +54,6 @@
             <div class="border border-slate-200 bg-white p-6 text-sm text-slate-500">Belum ada berita pada kategori ini.</div>
         @endif
 
-        @if(method_exists($articles, 'links'))<div class="mt-6 border-t border-slate-200 pt-5">{{ $articles->links() }}</div>@endif
+        <div class="mt-6 border-t border-slate-200 pt-5">{{ $articles->links() }}</div>
     </section>
 @endsection
