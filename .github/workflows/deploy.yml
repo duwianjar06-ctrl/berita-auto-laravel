@@ -207,15 +207,15 @@ jobs:
           set net:timeout 30
           cd "$FTP_SERVER_DIR"
           lcd "$GITHUB_WORKSPACE/remote-log"
-          get storage/logs/laravel.log
+          glob -a get storage/logs/*.log
           bye
           LFTP
           then
             echo "LARAVEL_LOG_DIAGNOSTIC_START"
-            grep -E 'ERROR|CRITICAL|Exception|ErrorException|Fatal' "$GITHUB_WORKSPACE/remote-log/laravel.log" | tail -n 30 | sed -E 's/(password|passwd|secret|token|api[_-]?key)[^, ]*/\1=[REDACTED]/Ig' || true
+            grep -hE 'ERROR|CRITICAL|Exception|ErrorException|Fatal' "$GITHUB_WORKSPACE/remote-log"/*.log | tail -n 40 | sed -E 's/(password|passwd|secret|token|api[_-]?key)[^, ]*/\1=[REDACTED]/Ig' || true
             echo "LARAVEL_LOG_DIAGNOSTIC_END"
           else
-            echo "LARAVEL_LOG_DIAGNOSTIC: log unavailable over FTP"
+            echo "LARAVEL_LOG_DIAGNOSTIC: daily log unavailable over FTP"
           fi
       - name: Verify production favicon and HTML
         run: |
