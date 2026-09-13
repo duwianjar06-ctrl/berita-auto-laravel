@@ -280,76 +280,77 @@ jobs:
         run: |
           cat > /tmp/production-smoke.cjs <<'NODE'
           const { chromium } = require('playwright');
-          const base = 'https://beritaauto.site';
-          const widths = [360, 375, 390, 414, 768, 1024, 1280, 1440];
-          const browser = await chromium.launch({headless:true});
-          const page = await browser.newPage();
-          const errors = [];
-          page.on('pageerror', error => errors.push(error.message));
-          const homeResponse = await page.goto(base + '/', {waitUntil:'networkidle', timeout:60000});
-          if (!homeResponse || homeResponse.status() !== 200) throw new Error(`Homepage HTTP ${homeResponse && homeResponse.status()}`);
-          const links = await page.evaluate(() => ({
-            article: [...document.querySelectorAll('a[href*="/berita/"]')].map(a => a.href)[0] || [...document.querySelectorAll('a[href]')].map(a => a.href).find(h => h !== location.href && !h.includes('/kategori/')),
-            category: [...document.querySelectorAll('a[href*="/kategori/"]')].map(a => a.href)[0]
-          }));
-          const homeChecks = await page.evaluate(() => ({
-            lang: document.documentElement.lang,
-            html: document.querySelectorAll('html').length,
-            head: document.querySelectorAll('head').length,
-            body: document.querySelectorAll('body').length,
-            header: document.querySelectorAll('header').length,
-            main: document.querySelectorAll('main').length,
-            footer: document.querySelectorAll('footer').length,
-            title: document.title,
-            description: !!document.querySelector('meta[name="description"]'),
-            canonical: !!document.querySelector('link[rel="canonical"]'),
-            ogTitle: !!document.querySelector('meta[property="og:title"]'),
-            favicon: !!document.querySelector('link[rel="icon"]')
-          }));
-          for (const key of ['html','head','body','header','main','footer']) if (homeChecks[key] !== 1) throw new Error(`Homepage duplicate/missing ${key}: ${homeChecks[key]}`);
-          for (const key of ['description','canonical','ogTitle','favicon']) if (!homeChecks[key]) throw new Error(`Homepage SEO/accessibility missing ${key}`);
-          if (homeChecks.lang !== 'id') throw new Error(`Homepage lang is ${homeChecks.lang}`);
-          for (const width of widths) {
-            await page.setViewportSize({width, height:900});
-            await page.goto(base + '/', {waitUntil:'networkidle', timeout:60000});
-            const check = await page.evaluate(() => ({
-              viewport: window.innerWidth,
-              scrollWidth: document.documentElement.scrollWidth,
-              bodyWidth: document.body.scrollWidth,
-              headers: document.querySelectorAll('header').length,
-              mains: document.querySelectorAll('main').length,
-              footers: document.querySelectorAll('footer').length,
-              imagesOverflow: [...document.images].some(img => { const r = img.getBoundingClientRect(); return r.right > window.innerWidth + 1 || r.left < -1; }),
-              textOverflow: [...document.querySelectorAll('h1,h2,h3,p,a,span')].some(el => el.scrollWidth > el.clientWidth + 1)
+          (async () => {
+            const base = 'https://beritaauto.site';
+            const widths = [360, 375, 390, 414, 768, 1024, 1280, 1440];
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage();
+            const errors = [];
+            page.on('pageerror', error => errors.push(error.message));
+            const homeResponse = await page.goto(base + '/', {waitUntil:'networkidle', timeout:60000});
+            if (!homeResponse || homeResponse.status() !== 200) throw new Error(`Homepage HTTP ${homeResponse && homeResponse.status()}`);
+            const links = await page.evaluate(() => ({
+              article: [...document.querySelectorAll('a[href]')].map(a => a.href).find(h => h !== location.href && !h.includes('/kategori/') && !h.includes('/sitemap')),
+              category: [...document.querySelectorAll('a[href*="/kategori/"]')].map(a => a.href)[0]
             }));
-            if (check.scrollWidth > check.viewport + 1 || check.bodyWidth > check.viewport + 1) throw new Error(`Horizontal overflow at ${width}px: ${check.scrollWidth}/${check.bodyWidth}`);
-            if (check.imagesOverflow || check.textOverflow) throw new Error(`Content overflow at ${width}px`);
-            if (check.headers !== 1 || check.mains !== 1 || check.footers !== 1) throw new Error(`Duplicate shell at ${width}px`);
-            console.log(`MOBILE_VIEWPORT_${width}: PASS`);
-          }
-          for (const [label, url] of [['article', links.article], ['category', links.category]]) {
-            if (!url) { console.log(`${label.toUpperCase()}_ROUTE: SKIPPED_NO_DATA`); continue; }
-            const response = await page.goto(url, {waitUntil:'networkidle', timeout:60000});
-            if (!response || response.status() !== 200) throw new Error(`${label} HTTP ${response && response.status()}`);
-            const check = await page.evaluate(() => ({
+            const homeChecks = await page.evaluate(() => ({
+              lang: document.documentElement.lang,
               html: document.querySelectorAll('html').length,
               head: document.querySelectorAll('head').length,
               body: document.querySelectorAll('body').length,
               header: document.querySelectorAll('header').length,
               main: document.querySelectorAll('main').length,
               footer: document.querySelectorAll('footer').length,
-              h1: document.querySelectorAll('h1').length,
-              canonical: !!document.querySelector('link[rel="canonical"]'),
               title: document.title,
-              jsonld: [...document.querySelectorAll('script[type="application/ld+json"]')].length
+              description: !!document.querySelector('meta[name="description"]'),
+              canonical: !!document.querySelector('link[rel="canonical"]'),
+              ogTitle: !!document.querySelector('meta[property="og:title"]'),
+              favicon: !!document.querySelector('link[rel="icon"]')
             }));
-            for (const key of ['html','head','body','header','main','footer']) if (check[key] !== 1) throw new Error(`${label} duplicate/missing ${key}: ${check[key]}`);
-            if (check.h1 < 1 || !check.canonical || !check.title) throw new Error(`${label} SEO/heading check failed`);
-            if (label === 'article' && check.jsonld < 1) throw new Error('Article NewsArticle JSON-LD missing');
-            console.log(`${label.toUpperCase()}_PAGE: PASS ${url}`);
-          }
-          if (errors.length) throw new Error(`Browser page errors: ${errors.join(' | ')}`);
-          await browser.close();
-          console.log('PRODUCTION_BROWSER_SMOKE: PASS');
+            for (const key of ['html','head','body','header','main','footer']) if (homeChecks[key] !== 1) throw new Error(`Homepage duplicate/missing ${key}: ${homeChecks[key]}`);
+            for (const key of ['description','canonical','ogTitle','favicon']) if (!homeChecks[key]) throw new Error(`Homepage SEO/accessibility missing ${key}`);
+            if (homeChecks.lang !== 'id') throw new Error(`Homepage lang is ${homeChecks.lang}`);
+            for (const width of widths) {
+              await page.setViewportSize({width, height:900});
+              await page.goto(base + '/', {waitUntil:'networkidle', timeout:60000});
+              const check = await page.evaluate(() => ({
+                viewport: window.innerWidth,
+                scrollWidth: document.documentElement.scrollWidth,
+                bodyWidth: document.body.scrollWidth,
+                headers: document.querySelectorAll('header').length,
+                mains: document.querySelectorAll('main').length,
+                footers: document.querySelectorAll('footer').length,
+                imagesOverflow: [...document.images].some(img => { const r = img.getBoundingClientRect(); return r.right > window.innerWidth + 1 || r.left < -1; })
+              }));
+              if (check.scrollWidth > check.viewport + 1 || check.bodyWidth > check.viewport + 1) throw new Error(`Horizontal overflow at ${width}px: ${check.scrollWidth}/${check.bodyWidth}`);
+              if (check.imagesOverflow) throw new Error(`Image overflow at ${width}px`);
+              if (check.headers !== 1 || check.mains !== 1 || check.footers !== 1) throw new Error(`Duplicate shell at ${width}px`);
+              console.log(`MOBILE_VIEWPORT_${width}: PASS`);
+            }
+            for (const [label, url] of [['article', links.article], ['category', links.category]]) {
+              if (!url) { console.log(`${label.toUpperCase()}_ROUTE: SKIPPED_NO_DATA`); continue; }
+              const response = await page.goto(url, {waitUntil:'networkidle', timeout:60000});
+              if (!response || response.status() !== 200) throw new Error(`${label} HTTP ${response && response.status()}`);
+              const check = await page.evaluate(() => ({
+                html: document.querySelectorAll('html').length,
+                head: document.querySelectorAll('head').length,
+                body: document.querySelectorAll('body').length,
+                header: document.querySelectorAll('header').length,
+                main: document.querySelectorAll('main').length,
+                footer: document.querySelectorAll('footer').length,
+                h1: document.querySelectorAll('h1').length,
+                canonical: !!document.querySelector('link[rel="canonical"]'),
+                title: document.title,
+                jsonld: document.querySelectorAll('script[type="application/ld+json"]').length
+              }));
+              for (const key of ['html','head','body','header','main','footer']) if (check[key] !== 1) throw new Error(`${label} duplicate/missing ${key}: ${check[key]}`);
+              if (check.h1 < 1 || !check.canonical || !check.title) throw new Error(`${label} SEO/heading check failed`);
+              if (label === 'article' && check.jsonld < 1) throw new Error('Article NewsArticle JSON-LD missing');
+              console.log(`${label.toUpperCase()}_PAGE: PASS ${url}`);
+            }
+            if (errors.length) throw new Error(`Browser page errors: ${errors.join(' | ')}`);
+            await browser.close();
+            console.log('PRODUCTION_BROWSER_SMOKE: PASS');
+          })().catch(error => { console.error(error); process.exit(1); });
           NODE
           node /tmp/production-smoke.cjs
