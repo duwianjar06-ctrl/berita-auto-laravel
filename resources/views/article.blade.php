@@ -1,5 +1,20 @@
 @extends('layouts.app')
 
+@push('head')
+    <script type="application/ld+json">{!! json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'NewsArticle',
+        'headline' => $article->title,
+        'description' => $article->excerpt ?: $article->title,
+        'mainEntityOfPage' => route('article', $article->slug),
+        'datePublished' => optional($article->site_published_at)->toAtomString(),
+        'dateModified' => optional($article->updated_at)->toAtomString(),
+        'image' => $article->image_url ? [$article->image_url] : null,
+        'author' => ($article->source_name ?: $article->publisher) ? [['@type' => 'Organization', 'name' => $article->source_name ?: $article->publisher]] : null,
+        'publisher' => ['@type' => 'Organization', 'name' => 'Berita Auto', 'url' => url('/')],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) !!}</script>
+@endpush
+
 @section('content')
     <div class="mx-auto max-w-5xl">
         <nav class="mb-6 text-sm text-slate-500" aria-label="Breadcrumb">
