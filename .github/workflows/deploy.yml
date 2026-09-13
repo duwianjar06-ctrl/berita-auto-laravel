@@ -187,13 +187,21 @@ jobs:
           favicon_headers="$(curl --silent --show-error --location --max-time 60 --dump-header - --output /dev/null https://beritaauto.site/favicon.svg)"
           favicon_status="$(printf '%s\n' "$favicon_headers" | awk 'toupper($1) ~ /^HTTP\// {code=$2} END {print code}')"
           favicon_type="$(printf '%s\n' "$favicon_headers" | awk 'BEGIN{IGNORECASE=1} /^content-type:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/[[:space:];].*$/, ""); type=$0} END {print type}')"
-          html="$(curl --silent --show-error --fail --location --max-time 60 https://beritaauto.site/)"
+          html_file="$(mktemp)"
+          html_status="$(curl --silent --show-error --location --max-time 60 --output "$html_file" --write-out '%{http_code}' https://beritaauto.site/ || true)"
           echo "FAVICON_HTTP_STATUS: $favicon_status"
           echo "FAVICON_CONTENT_TYPE: $favicon_type"
+          echo "HOMEPAGE_HTTP_STATUS: $html_status"
+          if [[ "$html_status" != "200" ]]; then
+            echo "HOMEPAGE_RESPONSE_DIAGNOSTIC_START"
+            sed -n '1,120p' "$html_file"
+            echo "HOMEPAGE_RESPONSE_DIAGNOSTIC_END"
+            exit 1
+          fi
           test "$favicon_status" = "200"
           test "$favicon_type" = "image/svg+xml"
-          printf '%s' "$html" | grep -Fq '<link rel="icon"'
-          ! printf '%s' "$html" | grep -Eiq 'localhost|127\.0\.0\.1|berita-auto\.vercel\.app'
+          grep -Fq '<link rel="icon"' "$html_file"
+          ! grep -Eiq 'localhost|127\.0\.0\.1|berita-auto\.vercel\.app' "$html_file"
           echo "PRODUCTION_HTML_FAVICON: FOUND"
           echo "FAVICON_PRODUCTION_FILE: public/favicon.svg"
           echo "FAVICON_DEPLOY: SUCCESS"
