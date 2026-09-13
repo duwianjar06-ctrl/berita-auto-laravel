@@ -8,9 +8,7 @@
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Berita Utama</p>
                 <h1 id="featured-heading" class="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Berita Auto</h1>
             </div>
-            @if(method_exists($articles, 'total'))
-                <span class="hidden text-sm text-slate-500 sm:block">{{ $articles->total() }} berita</span>
-            @endif
+            <span class="hidden text-sm text-slate-500 sm:block">{{ $articles->total() }} berita</span>
         </div>
 
         @if($articleItems->isNotEmpty())
@@ -18,7 +16,7 @@
             <div class="grid gap-7 lg:grid-cols-[minmax(0,1.6fr)_minmax(280px,.8fr)]">
                 <article class="min-w-0">
                     @if($featured->image_url)
-                        <a href="{{ route('article', $featured->slug) }}" class="group block overflow-hidden bg-slate-100 aspect-[16/9]" aria-label="Baca {{ $featured->title }}">
+                        <a href="{{ route('article', $featured->slug) }}" class="group block aspect-[16/9] overflow-hidden bg-slate-100" aria-label="Baca {{ $featured->title }}">
                             <img src="{{ $featured->image_url }}" alt="{{ $featured->image_alt ?: $featured->title }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" fetchpriority="high">
                         </a>
                     @endif
@@ -51,7 +49,9 @@
                                 @endif
                                 <p class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $article->category?->name ?: 'Berita' }}</p>
                                 <h3 class="mt-1 text-xl font-extrabold leading-snug"><a href="{{ route('article', $article->slug) }}" class="hover:underline decoration-2 underline-offset-4">{{ $article->title }}</a></h3>
-                                @if($article->excerpt)<p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{{ $article->excerpt }}</p>@endif
+                                @if($article->excerpt)
+                                    <p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{{ $article->excerpt }}</p>
+                                @endif
                                 <time class="mt-2 block text-xs text-slate-500" datetime="{{ optional($article->site_published_at)->toAtomString() }}">{{ optional($article->site_published_at)->format('d M Y H:i') }}</time>
                             </article>
                         @endforeach
@@ -78,31 +78,33 @@
                         @endif
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <span>{{ $article->category?->name ?: 'Berita' }}</span><span aria-hidden="true">·</span>
+                                <span>{{ $article->category?->name ?: 'Berita' }}</span>
+                                <span aria-hidden="true">·</span>
                                 <time datetime="{{ optional($article->site_published_at)->toAtomString() }}">{{ optional($article->site_published_at)->format('d M Y H:i') }}</time>
                             </div>
                             <h3 class="mt-1 text-xl font-extrabold leading-snug sm:text-2xl"><a href="{{ route('article', $article->slug) }}" class="hover:underline decoration-2 underline-offset-4">{{ $article->title }}</a></h3>
-                            @if($article->excerpt)<p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 sm:text-base">{{ $article->excerpt }}</p>@endif
+                            @if($article->excerpt)
+                                <p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 sm:text-base">{{ $article->excerpt }}</p>
+                            @endif
                         </div>
                     </article>
                 @endforeach
             </div>
-            @if(method_exists($articles, 'links'))<div class="border-t border-slate-200 pt-5">{{ $articles->links() }}</div>@endif
+            <div class="border-t border-slate-200 pt-5">{{ $articles->links() }}</div>
         </section>
     @endif
 
     <section class="mt-10 border-t border-slate-200 pt-8" aria-labelledby="category-heading">
-        <div class="flex items-end justify-between gap-4">
-            <div>
-                <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Jelajahi topik</p>
-                <h2 id="category-heading" class="mt-1 text-2xl font-black tracking-tight">Kategori</h2>
-            </div>
+        <div>
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Jelajahi topik</p>
+            <h2 id="category-heading" class="mt-1 text-2xl font-black tracking-tight">Kategori</h2>
         </div>
         @if($categories->count())
             <nav class="mt-4 flex gap-2 overflow-x-auto pb-2" aria-label="Kategori berita">
                 @foreach($categories as $category)
                     <a href="{{ route('category', $category->name) }}" class="shrink-0 border border-slate-300 bg-white px-4 py-2 text-sm font-bold hover:border-slate-900 hover:bg-slate-900 hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
-                        {{ $category->name }} <span class="ml-1 text-slate-500">{{ $category->articles_count }}</span>
+                        {{ $category->name }}
+                        <span class="ml-1 text-slate-500">{{ $category->articles_count }}</span>
                     </a>
                 @endforeach
             </nav>
