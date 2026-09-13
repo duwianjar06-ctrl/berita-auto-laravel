@@ -1,67 +1,16 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\Article;
 use App\Models\Category;
 use Illuminate\Http\Response;
-
-class PublicController extends Controller
-{
-    private function navigationCategories()
-    {
-        return Category::withCount('articles')->orderBy('name')->get();
-    }
-
-    public function home()
-    {
-        $articles = Article::where('generation_status', 'published')->latest('site_published_at')->paginate(12);
-        return view('home', ['title'=>'Berita Auto — Berita Terbaru','description'=>'Berita terbaru dan pilihan editorial dari Berita Auto.','canonical'=>url('/'),'articles'=>$articles,'categories'=>$this->navigationCategories()]);
-    }
-
-    public function article(string $slug)
-    {
-        $article = Article::with('category')->where('slug',$slug)->where('generation_status','published')->firstOrFail();
-        $related = $this->relatedArticles($article, 5);
-        $next = Article::where('generation_status','published')->where('site_published_at','>',$article->site_published_at)->orderBy('site_published_at')->first();
-        return view('article', [
-            'title'=>$article->title.' — Berita Auto',
-            'description'=>$article->excerpt ?: $article->title,
-            'canonical'=>route('article',$article->slug),
-            'ogType'=>'article','ogImage'=>$article->image_url,
-            'publishedAt'=>optional($article->site_published_at)->toAtomString(),
-            'modifiedAt'=>optional($article->updated_at_content ?: $article->updated_at)->toAtomString(),
-            'article'=>$article,'related'=>$related,'nextArticle'=>$next,'categories'=>$this->navigationCategories(),
-        ]);
-    }
-
-    public function category(string $category)
-    {
-        $cat=Category::where('name',$category)->firstOrFail();
-        $articles=$cat->articles()->where('generation_status','published')->latest('site_published_at')->paginate(12);
-        return view('category',['title'=>$cat->name.' — Berita Auto','description'=>'Berita terbaru dalam kategori '.$cat->name.' di Berita Auto.','canonical'=>route('category',$cat->name),'articles'=>$articles,'cat'=>$cat,'categories'=>$this->navigationCategories()]);
-    }
-
-    private function relatedArticles(Article $article, int $limit=5)
-    {
-        $terms=preg_split('/\W+/u',mb_strtolower($article->title),-1,PREG_SPLIT_NO_EMPTY);
-        $terms=array_values(array_filter($terms,fn($term)=>mb_strlen($term)>=4));
-        $query=Article::with('category')->where('generation_status','published')->whereKeyNot($article->id)->where(function($q)use($article,$terms){$q->where('category_id',$article->category_id);foreach(array_slice($terms,0,8) as $term)$q->orWhere('title','like','%'.$term.'%');})->latest('site_published_at')->limit($limit*3);
-        $items=$query->get();
-        return $items->sortByDesc(function($item)use($article,$terms){$score=$item->category_id===$article->category_id?5:0;$title=mb_strtolower($item->title);foreach($terms as $term)if(str_contains($title,$term))$score++;return $score;})->take($limit)->values();
-    }
-
-    public function robots(): Response
-    {
-        $body="User-agent: *\nAllow: /\nDisallow: /admin-\nDisallow: /api/\nSitemap: ".url('/sitemap.xml')."\n";
-        return response($body,200,['Content-Type'=>'text/plain']);
-    }
-
-    public function sitemap(): Response
-    {
-        $urls=[['loc'=>url('/'),'lastmod'=>now()->toAtomString()]];
-        foreach(Category::orderBy('name')->get() as $category){$urls[]=['loc'=>route('category',$category->name)];}
-        foreach(Article::where('generation_status','published')->whereNotNull('site_published_at')->latest('site_published_at')->get() as $article){$modified=$article->updated_at_content ?: $article->site_published_at;$urls[]=['loc'=>route('article',$article->slug),'lastmod'=>$modified->toAtomString()];}
-        return response()->view('sitemap',['urls'=>$urls])->header('Content-Type','application/xml');
-    }
+class PublicController {
+ private function navigationCategories(){return Category::withCount('articles')->orderBy('name')->get();}
+ public function home(){ $articles=Article::where('generation_status','published')->latest('site_published_at')->paginate(12);return view('home',['title'=>'Berita Auto — Berita Terbaru','description'=>'Berita terbaru dan pilihan editorial dari Berita Auto.','canonical'=>url('/'),'articles'=>$articles,'categories'=>$this->navigationCategories()]); }
+ public function article(string $slug){$article=Article::with('category')->where('slug',$slug)->where('generation_status','published')->firstOrFail();$related=$this->relatedArticles($article,5);$next=Article::where('generation_status','published')->where('site_published_at','>',$article->site_published_at)->orderBy('site_published_at')->first();return view('article',['title'=>$article->title.' — Berita Auto','description'=>$article->excerpt?:$article->title,'canonical'=>route('article',$article->slug),'ogType'=>'article','ogImage'=>$article->image_url,'publishedAt'=>optional($article->site_published_at)->toAtomString(),'modifiedAt'=>optional($article->updated_at_content?:$article->updated_at)->toAtomString(),'article'=>$article,'related'=>$related,'nextArticle'=>$next,'categories'=>$this->navigationCategories()]);}
+ public function category(string $category){$cat=Category::where('name',$category)->firstOrFail();$articles=$cat->articles()->where('generation_status','published')->latest('site_published_at')->paginate(12);$relatedTopics=Category::whereKeyNot($cat->id)->withCount('articles')->orderByDesc('articles_count')->limit(6)->get();return view('category',['title'=>$cat->name.' — Berita Auto','description'=>'Berita terbaru dalam kategori '.$cat->name.' di Berita Auto.','canonical'=>route('category',$cat->name),'articles'=>$articles,'cat'=>$cat,'relatedTopics'=>$relatedTopics,'categories'=>$this->navigationCategories()]);}
+ public function editorialPage(string $page){$pages=['tentang-kami'=>['title'=>'Tentang Kami','intro'=>'Berita Auto adalah portal berita yang menyajikan berita terbaru berdasarkan sumber yang tersedia dan melalui proses editorial.'],'kontak'=>['title'=>'Kontak','intro'=>'Informasi kontak publik belum tersedia dalam data aplikasi. Halaman ini tidak menampilkan alamat atau identitas yang tidak terverifikasi.'],'kebijakan-privasi'=>['title'=>'Kebijakan Privasi','intro'=>'Berita Auto hanya mengumpulkan data yang diperlukan untuk menjalankan layanan, keamanan, autentikasi admin, dan operasional aplikasi.'],'disclaimer'=>['title'=>'Disclaimer','intro'=>'Informasi berita dapat berubah ketika sumber memperbarui informasi. Pembaca sebaiknya merujuk sumber asli untuk konteks lengkap.'],'editorial-policy'=>['title'=>'Editorial Policy','intro'=>'Berita Auto memprioritaskan akurasi, sumber yang dapat ditelusuri, kejelasan tanggal, pencegahan duplikasi, dan pemeriksaan kualitas sebelum publikasi. Konten otomatis tidak dipublikasikan langsung tanpa quality gate dan review editorial.']];abort_unless(isset($pages[$page]),404);$data=$pages[$page];return view('editorial-page',['title'=>$data['title'].' — Berita Auto','description'=>$data['intro'],'canonical'=>url('/'.$page),'page'=>$page,'heading'=>$data['title'],'intro'=>$data['intro'],'categories'=>$this->navigationCategories()]);}
+ private function relatedArticles(Article $article,int $limit=5){$terms=preg_split('/\W+/u',mb_strtolower($article->title),-1,PREG_SPLIT_NO_EMPTY);$terms=array_values(array_filter($terms,fn($term)=>mb_strlen($term)>=4));$items=Article::with('category')->where('generation_status','published')->whereKeyNot($article->id)->where(function($q)use($article,$terms){$q->where('category_id',$article->category_id);foreach(array_slice($terms,0,8) as $term)$q->orWhere('title','like','%'.$term.'%');})->latest('site_published_at')->limit($limit*3)->get();return $items->sortByDesc(function($item)use($article,$terms){$score=$item->category_id===$article->category_id?5:0;$title=mb_strtolower($item->title);foreach($terms as $term)if(str_contains($title,$term))$score++;return $score;})->take($limit)->values();}
+ public function robots():Response{$body="User-agent: *\nAllow: /\nDisallow: /admin-\nDisallow: /api/\nSitemap: ".url('/sitemap.xml')."\n";return response($body,200,['Content-Type'=>'text/plain']);}
+ public function sitemap():Response{$urls=[['loc'=>url('/'),'lastmod'=>now()->toAtomString()]];foreach(Category::orderBy('name')->get() as $category)$urls[]=['loc'=>route('category',$category->name)];foreach(Article::where('generation_status','published')->whereNotNull('site_published_at')->latest('site_published_at')->get() as $article){$modified=$article->updated_at_content?:$article->site_published_at;$urls[]=['loc'=>route('article',$article->slug),'lastmod'=>$modified->toAtomString()];}return response()->view('sitemap',['urls'=>$urls])->header('Content-Type','application/xml');}
 }
