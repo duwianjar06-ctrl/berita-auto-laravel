@@ -22,6 +22,9 @@ class PublicController extends Controller
             ->paginate(12);
 
         return view('home', [
+            'title' => 'Berita Auto — Berita Terbaru',
+            'description' => 'Berita terbaru dan pilihan editorial dari Berita Auto.',
+            'canonical' => url('/'),
             'articles' => $articles,
             'categories' => $this->navigationCategories(),
         ]);
@@ -35,6 +38,13 @@ class PublicController extends Controller
             ->firstOrFail();
 
         return view('article', [
+            'title' => $article->title . ' — Berita Auto',
+            'description' => $article->excerpt ?: $article->title,
+            'canonical' => route('article', $article->slug),
+            'ogType' => 'article',
+            'ogImage' => $article->image_url,
+            'publishedAt' => optional($article->site_published_at)->toAtomString(),
+            'modifiedAt' => optional($article->updated_at)->toAtomString(),
             'article' => $article,
             'categories' => $this->navigationCategories(),
         ]);
@@ -49,8 +59,11 @@ class PublicController extends Controller
             ->paginate(12);
 
         return view('category', [
-            'cat' => $cat,
+            'title' => $cat->name . ' — Berita Auto',
+            'description' => 'Berita terbaru dalam kategori ' . $cat->name . ' di Berita Auto.',
+            'canonical' => route('category', $cat->name),
             'articles' => $articles,
+            'cat' => $cat,
             'categories' => $this->navigationCategories(),
         ]);
     }
