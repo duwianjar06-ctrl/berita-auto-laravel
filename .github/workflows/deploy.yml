@@ -150,6 +150,7 @@ jobs:
           set -euo pipefail
           repo_sha="$(sha256sum "$GITHUB_WORKSPACE/resources/views/home.blade.php" | awk '{print $1}')"
           rm -f "$GITHUB_WORKSPACE/remote-home.blade.php"
+          mkdir -p "$GITHUB_WORKSPACE/remote-download"
           lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
           set cmd:fail-exit yes
           set ftp:ssl-force true
@@ -160,9 +161,11 @@ jobs:
           set net:reconnect-interval-base 5
           set net:reconnect-interval-max 30
           cd "$FTP_SERVER_DIR"
-          get -o "$GITHUB_WORKSPACE/remote-home.blade.php" resources/views/home.blade.php
+          lcd "$GITHUB_WORKSPACE/remote-download"
+          get resources/views/home.blade.php -o remote-home.blade.php
           bye
           LFTP
+          cp "$GITHUB_WORKSPACE/remote-download/remote-home.blade.php" "$GITHUB_WORKSPACE/remote-home.blade.php"
           remote_sha="$(sha256sum "$GITHUB_WORKSPACE/remote-home.blade.php" | awk '{print $1}')"
           echo "REPOSITORY_HOME_BLADE_SHA256: $repo_sha"
           echo "REMOTE_HOME_BLADE_SHA256: $remote_sha"
