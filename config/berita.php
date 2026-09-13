@@ -12,7 +12,7 @@ return [
  'news_publish_target'=>(int)env('NEWS_PUBLISH_TARGET',2),
  'news_candidate_scan_max'=>(int)env('NEWS_CANDIDATE_SCAN_MAX',10),
  'news_min_source_chars'=>(int)env('NEWS_MIN_SOURCE_CHARS',1000),
- 'news_min_quality_score'=>(int)env('NEWS_MIN_QUALITY_SCORE',75),
+ 'news_min_quality_score'=>(int)env('NEWS_MIN_QUALITY_SCORE',85),
  'news_max_generation_attempts'=>(int)env('NEWS_MAX_GENERATION_ATTEMPTS',3),
  'instagram_ready_low_watermark'=>(int)env('INSTAGRAM_READY_LOW_WATERMARK',2),
  'instagram_ready_high_watermark'=>(int)env('INSTAGRAM_READY_HIGH_WATERMARK',5),
