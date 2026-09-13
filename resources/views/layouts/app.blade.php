@@ -10,6 +10,9 @@
     <meta property="og:title" content="{{ $title ?? 'Berita Auto' }}">
     <meta property="og:description" content="{{ $description ?? 'Berita terkini Berita Auto' }}">
     <meta name="theme-color" content="#0f172a">
+    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="shortcut icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ asset('favicon.svg') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
