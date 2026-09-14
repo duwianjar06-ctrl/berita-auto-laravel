@@ -276,7 +276,7 @@ jobs:
 
       - name: Test production at all required viewports and routes
         run: |
-          cat > /tmp/production-smoke.cjs <<'NODE'
+          cat > production-smoke.cjs <<'NODE'
           const { chromium } = require('playwright');
 
           (async () => {
@@ -303,9 +303,8 @@ jobs:
                 .map(a => a.href)
                 .find(
                   h =>
-                    h !== location.href &&
-                    !h.includes('/kategori/') &&
-                    !h.includes('/sitemap')
+                    h.includes('/artikel/') ||
+                    h.includes('/berita/')
                 ),
 
               category: [...document.querySelectorAll('a[href*="/kategori/"]')]
@@ -509,4 +508,4 @@ jobs:
           });
           NODE
 
-          node /tmp/production-smoke.cjs
+          node production-smoke.cjs
