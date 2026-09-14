@@ -53,7 +53,9 @@ printf '%s\n' '================================' 'SAFE FTPS DEPLOYMENT' '=======
 printf 'Target SHA: %s\n' "$GITHUB_SHA"
 printf 'Remote base: %s\n' "$BASE"
 printf 'Deployment mode: %s\n' "$DEPLOY_MODE"
-printf '%s\n' 'Transfer mode: fresh overwrite; no resume/continuation'
+printf '%s\n' 'Transfer mode: transfer-all; fresh overwrite; no resume/continuation'
+printf '%s\n' 'Remote-only deletion: disabled for recovery'
+printf '%s\n' 'Protected production-owned paths: .env, .env.*, storage/**, public/storage/**, public/.user.ini, public/php.ini, public/.well-known/**, .ftpquota, cgi-bin/**'
 printf '%s\n' '================================'
 
 # Build a deployment-only tree from tracked repository files. This prevents
@@ -69,10 +71,10 @@ find "$STAGE" -type f \( -name '.env' -o -name '.env.*' \) -delete
 remote_mkdir "$BASE"
 remote_mkdir "$BASE/.deploy"
 
-# Recovery mode replaces the complete tracked application tree. No resume,
-# pget, continuation, or timestamp optimization is used. Runtime-only paths
-# are excluded from --delete and therefore cannot be removed.
-lftp_common "mirror --reverse --delete --ignore-time --parallel=1 --no-perms --verbose --exclude-glob 'vendor/**' --exclude-glob 'node_modules/**' --exclude-glob 'tests/**' --exclude-glob '.git/**' --exclude-glob '.github/**' --exclude-glob '.env' --exclude-glob '.env.*' --exclude-glob 'storage/**' --exclude-glob 'public/storage/**' --exclude-glob 'cgi-bin/**' --exclude-glob '.deploy/**' --exclude-glob '.phpunit.cache/**' --exclude-glob '.phpunit.result.cache' --exclude-glob '.idea/**' --exclude-glob '.vscode/**' --exclude-glob '.DS_Store' "$STAGE/" \"$BASE\""
+# Recovery deliberately overwrites every staged source file, even when the
+# remote size and timestamp appear unchanged. --delete is intentionally absent:
+# hosting/runtime files not managed by Git must remain untouched.
+lftp_common "mirror --reverse --transfer-all --parallel=1 --no-perms --verbose --exclude-glob 'vendor/**' --exclude-glob 'node_modules/**' --exclude-glob 'tests/**' --exclude-glob '.git/**' --exclude-glob '.github/**' --exclude-glob '.env' --exclude-glob '.env.*' --exclude-glob 'storage/**' --exclude-glob 'public/storage/**' --exclude-glob 'cgi-bin/**' --exclude-glob '.deploy/**' --exclude-glob '.phpunit.cache/**' --exclude-glob '.phpunit.result.cache' --exclude-glob '.idea/**' --exclude-glob '.vscode/**' --exclude-glob '.DS_Store' "$STAGE/" \"$BASE\""
 
 VERIFY_FILES=(
     "routes/web.php"
