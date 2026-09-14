@@ -12,7 +12,8 @@ class ArticleQualityGate {
   if($excerpt!=='')$score+=10;else $reasons[]='empty_excerpt';
   if(mb_strlen($excerpt)<=180)$score+=5;else $reasons[]='description_too_long';
   if(mb_strlen($content)>=500)$score+=20;elseif(mb_strlen($content)>=250)$score+=10;else $reasons[]='content_too_short';
-  if(mb_strlen($source)>=(int)config('berita.news_min_source_chars',1000))$score+=15;else $reasons[]='source_too_thin';
+  $minimumSourceChars=in_array($a->source_content_method,['rss_fallback','rss_summary'],true)?120:(int)config('berita.news_min_source_chars',1000);
+  if(mb_strlen($source)>=$minimumSourceChars)$score+=15;else $reasons[]='source_too_thin';
   if(filter_var($a->image_url,FILTER_VALIDATE_URL))$score+=10;else $reasons[]='invalid_image';
   if($a->publisher&&$a->category_id&&filter_var($a->source_url,FILTER_VALIDATE_URL)&&filter_var($a->canonical_url,FILTER_VALIDATE_URL)&&$a->source_published_at)$score+=10;else $reasons[]='metadata_incomplete';
   if(!$dup)$score+=10;else $reasons[]='duplicate';
