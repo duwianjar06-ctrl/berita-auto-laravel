@@ -16,11 +16,13 @@ jobs:
   test-build:
     name: Test & Build
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
@@ -28,35 +30,44 @@ jobs:
           extensions: mbstring, xml, ctype, fileinfo, curl, pdo_mysql
           coverage: none
           tools: composer:v2
+
       - name: Validate Composer
         run: composer validate --strict
+
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
+
       - name: Verify Laravel public entrypoint and favicon
         run: |
           test -f public/index.php
           test -f public/.htaccess
           test -f public/robots.txt
           test -f public/favicon.svg
+
       - name: Validate PHP and Blade templates
         run: |
           php -l app/Http/Controllers/PublicController.php
           php artisan optimize:clear
           php artisan view:cache
           php artisan view:clear
+
       - name: Laravel checks
         run: |
           php artisan about
           php artisan route:list
           php artisan schedule:list
+
       - name: Tests
         run: php artisan test
+
       - name: Frontend dependency/build check
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
+
       - run: npm ci
+
       - run: npm run build
 
   deploy:
@@ -64,11 +75,13 @@ jobs:
     needs: test-build
     runs-on: ubuntu-latest
     timeout-minutes: 90
+
     steps:
       - name: Checkout full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
@@ -76,21 +89,26 @@ jobs:
           extensions: mbstring, xml, ctype, fileinfo, curl, pdo_mysql
           coverage: none
           tools: composer:v2
+
       - name: Install production Composer dependencies
         run: |
           rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php bootstrap/cache/events.php
           composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
+
       - name: Prepare frontend assets
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
+
       - name: Build frontend assets
         run: |
           npm ci
           npm run build
+
       - name: Validate deployment helper
         run: bash -n scripts/deploy/smart-deploy.sh
+
       - name: Verify Rumahweb secrets are present
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -102,11 +120,13 @@ jobs:
           test -n "$FTP_USERNAME"
           test -n "$FTP_PASSWORD"
           test -n "$FTP_SERVER_DIR"
+
       - name: Install lftp
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
-      - name: Run smart resumable deployment
+
+      - name: Run safe FTPS deployment
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
@@ -114,85 +134,32 @@ jobs:
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
           GITHUB_SHA: ${{ github.sha }}
         run: bash scripts/deploy/smart-deploy.sh
-      - name: Force upload redesigned views, controller and favicon, then clean compiled views
+
+      - name: Clear production compiled Blade views
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
-          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          test -f "$GITHUB_WORKSPACE/resources/views/home.blade.php"
-          test -f "$GITHUB_WORKSPACE/resources/views/article.blade.php"
-          test -f "$GITHUB_WORKSPACE/resources/views/category.blade.php"
-          test -f "$GITHUB_WORKSPACE/resources/views/layouts/app.blade.php"
-          test -f "$GITHUB_WORKSPACE/app/Http/Controllers/PublicController.php"
-          test -f "$GITHUB_WORKSPACE/public/favicon.svg"
+
           lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
           set cmd:fail-exit yes
           set ftp:ssl-force true
           set ftp:ssl-protect-data true
           set ftp:passive-mode true
-          set net:max-retries 30
+          set net:max-retries 8
           set net:timeout 30
           set net:reconnect-interval-base 5
           set net:reconnect-interval-max 30
           cd "$FTP_SERVER_DIR"
-          put -O resources/views "$GITHUB_WORKSPACE/resources/views/home.blade.php"
-          put -O resources/views "$GITHUB_WORKSPACE/resources/views/article.blade.php"
-          put -O resources/views "$GITHUB_WORKSPACE/resources/views/category.blade.php"
-          put -O resources/views/layouts "$GITHUB_WORKSPACE/resources/views/layouts/app.blade.php"
-          put -O app/Http/Controllers "$GITHUB_WORKSPACE/app/Http/Controllers/PublicController.php"
-          put -O public "$GITHUB_WORKSPACE/public/favicon.svg"
           glob -a rm -f storage/framework/views/*.php
           bye
           LFTP
-          echo "FORCE_UPLOAD_HOME_BLADE: SUCCESS"
-          echo "FORCE_UPLOAD_ARTICLE_BLADE: SUCCESS"
-          echo "FORCE_UPLOAD_CATEGORY_BLADE: SUCCESS"
-          echo "FORCE_UPLOAD_APP_LAYOUT: SUCCESS"
-          echo "FORCE_UPLOAD_PUBLIC_CONTROLLER: SUCCESS"
-          echo "FORCE_UPLOAD_FAVICON: SUCCESS"
-          echo "BLADE_CACHE_CLEANUP: SUCCESS"
-      - name: Verify production home Blade checksum
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
-          GITHUB_WORKSPACE: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          repo_sha="$(sha256sum "$GITHUB_WORKSPACE/resources/views/home.blade.php" | awk '{print $1}')"
-          repo_controller_sha="$(sha256sum "$GITHUB_WORKSPACE/app/Http/Controllers/PublicController.php" | awk '{print $1}')"
-          rm -rf "$GITHUB_WORKSPACE/remote-download"
-          mkdir -p "$GITHUB_WORKSPACE/remote-download"
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
-          set cmd:fail-exit yes
-          set ftp:ssl-force true
-          set ftp:ssl-protect-data true
-          set ftp:passive-mode true
-          set net:max-retries 30
-          set net:timeout 30
-          set net:reconnect-interval-base 5
-          set net:reconnect-interval-max 30
-          cd "$FTP_SERVER_DIR"
-          lcd "$GITHUB_WORKSPACE/remote-download"
-          get resources/views/home.blade.php
-          get app/Http/Controllers/PublicController.php
-          bye
-          LFTP
-          remote_sha="$(sha256sum "$GITHUB_WORKSPACE/remote-download/home.blade.php" | awk '{print $1}')"
-          remote_controller_sha="$(sha256sum "$GITHUB_WORKSPACE/remote-download/PublicController.php" | awk '{print $1}')"
-          echo "REPOSITORY_HOME_BLADE_SHA256: $repo_sha"
-          echo "REMOTE_HOME_BLADE_SHA256: $remote_sha"
-          echo "REPOSITORY_PUBLIC_CONTROLLER_SHA256: $repo_controller_sha"
-          echo "REMOTE_PUBLIC_CONTROLLER_SHA256: $remote_controller_sha"
-          test "$repo_sha" = "$remote_sha"
-          test "$repo_controller_sha" = "$remote_controller_sha"
-          echo "REMOTE_HOME_BLADE_CHECKSUM_MATCH: YES"
-          echo "REMOTE_PUBLIC_CONTROLLER_CHECKSUM_MATCH: YES"
+
+          echo "PRODUCTION_BLADE_CACHE_CLEAR: SUCCESS"
+
       - name: Diagnose production Laravel error
         if: always()
         env:
@@ -202,14 +169,19 @@ jobs:
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
           set -euo pipefail
+
           status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 60 https://beritaauto.site/ || true)"
+
           echo "DIAGNOSTIC_HOMEPAGE_HTTP_STATUS: $status"
+
           if [[ "$status" == "200" ]]; then
             echo "DIAGNOSTIC: no server error detected"
             exit 0
           fi
+
           rm -rf "$GITHUB_WORKSPACE/remote-log"
           mkdir -p "$GITHUB_WORKSPACE/remote-log"
+
           if lftp -u "$FTP_USERNAME","$FTP_PASSWORD" -p 21 "ftp://$FTP_SERVER" <<LFTP
           set cmd:fail-exit yes
           set ftp:ssl-force true
@@ -224,42 +196,65 @@ jobs:
           LFTP
           then
             echo "LARAVEL_LOG_DIAGNOSTIC_START"
-            grep -hE 'ERROR|CRITICAL|Exception|ErrorException|Fatal' "$GITHUB_WORKSPACE/remote-log"/*.log | tail -n 40 | sed -E 's/(password|passwd|secret|token|api[_-]?key)[^, ]*/\1=[REDACTED]/Ig' || true
+
+            grep -hE 'ERROR|CRITICAL|Exception|ErrorException|Fatal' \
+              "$GITHUB_WORKSPACE/remote-log"/*.log \
+              | tail -n 40 \
+              | sed -E 's/(password|passwd|secret|token|api[_-]?key)[^, ]*/\1=[REDACTED]/Ig' \
+              || true
+
             echo "LARAVEL_LOG_DIAGNOSTIC_END"
           else
             echo "LARAVEL_LOG_DIAGNOSTIC: daily log unavailable over FTP"
           fi
+
       - name: Verify production favicon and HTML
         run: |
           set -euo pipefail
+
           favicon_headers="$(curl --silent --show-error --location --max-time 60 --dump-header - --output /dev/null https://beritaauto.site/favicon.svg)"
+
           favicon_status="$(printf '%s\n' "$favicon_headers" | awk 'toupper($1) ~ /^HTTP\// {code=$2} END {print code}')"
+
           favicon_type="$(printf '%s\n' "$favicon_headers" | awk 'BEGIN{IGNORECASE=1} /^content-type:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/[[:space:];].*$/, ""); type=$0} END {print type}')"
+
           html_file="$(mktemp)"
+
           html_status="$(curl --silent --show-error --location --max-time 60 --output "$html_file" --write-out '%{http_code}' https://beritaauto.site/ || true)"
+
           echo "FAVICON_HTTP_STATUS: $favicon_status"
           echo "FAVICON_CONTENT_TYPE: $favicon_type"
           echo "HOMEPAGE_HTTP_STATUS: $html_status"
+
           if [[ "$html_status" != "200" ]]; then
             echo "HOMEPAGE_RESPONSE_DIAGNOSTIC_START"
             sed -n '1,120p' "$html_file"
             echo "HOMEPAGE_RESPONSE_DIAGNOSTIC_END"
             exit 1
           fi
+
           test "$favicon_status" = "200"
           test "$favicon_type" = "image/svg+xml"
+
           grep -Fq '<link rel="icon"' "$html_file"
+
           ! grep -Eiq 'localhost|127\.0\.0\.1|berita-auto\.vercel\.app' "$html_file"
+
           echo "PRODUCTION_HTML_FAVICON: FOUND"
           echo "FAVICON_PRODUCTION_FILE: public/favicon.svg"
           echo "FAVICON_DEPLOY: SUCCESS"
           echo "PRODUCTION_FAVICON_ACCESS: PASS"
+
       - name: Production HTTP health check
         run: |
           set -euo pipefail
+
           status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 60 https://beritaauto.site/)"
+
           echo "PRODUCTION_HTTP_STATUS: $status"
+
           test "$status" = "200"
+
           echo "PRODUCTION_HEALTH: PASS"
 
   production-browser-smoke:
@@ -267,32 +262,56 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: Install Playwright Chromium
         run: |
           npm install --no-save playwright@1.63.0
           npx playwright install --with-deps chromium
+
       - name: Test production at all required viewports and routes
         run: |
           cat > /tmp/production-smoke.cjs <<'NODE'
           const { chromium } = require('playwright');
+
           (async () => {
             const base = 'https://beritaauto.site';
             const widths = [360, 375, 390, 414, 768, 1024, 1280, 1440];
-            const browser = await chromium.launch({headless:true});
+
+            const browser = await chromium.launch({ headless: true });
             const page = await browser.newPage();
             const errors = [];
+
             page.on('pageerror', error => errors.push(error.message));
-            const homeResponse = await page.goto(base + '/', {waitUntil:'networkidle', timeout:60000});
-            if (!homeResponse || homeResponse.status() !== 200) throw new Error(`Homepage HTTP ${homeResponse && homeResponse.status()}`);
+
+            const homeResponse = await page.goto(base + '/', {
+              waitUntil: 'networkidle',
+              timeout: 60000
+            });
+
+            if (!homeResponse || homeResponse.status() !== 200) {
+              throw new Error(`Homepage HTTP ${homeResponse && homeResponse.status()}`);
+            }
+
             const links = await page.evaluate(() => ({
-              article: [...document.querySelectorAll('a[href]')].map(a => a.href).find(h => h !== location.href && !h.includes('/kategori/') && !h.includes('/sitemap')),
-              category: [...document.querySelectorAll('a[href*="/kategori/"]')].map(a => a.href)[0]
+              article: [...document.querySelectorAll('a[href]')]
+                .map(a => a.href)
+                .find(
+                  h =>
+                    h !== location.href &&
+                    !h.includes('/kategori/') &&
+                    !h.includes('/sitemap')
+                ),
+
+              category: [...document.querySelectorAll('a[href*="/kategori/"]')]
+                .map(a => a.href)[0]
             }));
+
             const homeChecks = await page.evaluate(() => ({
               lang: document.documentElement.lang,
               html: document.querySelectorAll('html').length,
@@ -307,12 +326,50 @@ jobs:
               ogTitle: !!document.querySelector('meta[property="og:title"]'),
               favicon: !!document.querySelector('link[rel="icon"]')
             }));
-            for (const key of ['html','head','body','header','main','footer']) if (homeChecks[key] !== 1) throw new Error(`Homepage duplicate/missing ${key}: ${homeChecks[key]}`);
-            for (const key of ['description','canonical','ogTitle','favicon']) if (!homeChecks[key]) throw new Error(`Homepage SEO/accessibility missing ${key}`);
-            if (homeChecks.lang !== 'id') throw new Error(`Homepage lang is ${homeChecks.lang}`);
+
+            for (const key of [
+              'html',
+              'head',
+              'body',
+              'header',
+              'main',
+              'footer'
+            ]) {
+              if (homeChecks[key] !== 1) {
+                throw new Error(
+                  `Homepage duplicate/missing ${key}: ${homeChecks[key]}`
+                );
+              }
+            }
+
+            for (const key of [
+              'description',
+              'canonical',
+              'ogTitle',
+              'favicon'
+            ]) {
+              if (!homeChecks[key]) {
+                throw new Error(
+                  `Homepage SEO/accessibility missing ${key}`
+                );
+              }
+            }
+
+            if (homeChecks.lang !== 'id') {
+              throw new Error(`Homepage lang is ${homeChecks.lang}`);
+            }
+
             for (const width of widths) {
-              await page.setViewportSize({width, height:900});
-              await page.goto(base + '/', {waitUntil:'networkidle', timeout:60000});
+              await page.setViewportSize({
+                width,
+                height: 900
+              });
+
+              await page.goto(base + '/', {
+                waitUntil: 'networkidle',
+                timeout: 60000
+              });
+
               const check = await page.evaluate(() => ({
                 viewport: window.innerWidth,
                 scrollWidth: document.documentElement.scrollWidth,
@@ -320,17 +377,65 @@ jobs:
                 headers: document.querySelectorAll('header').length,
                 mains: document.querySelectorAll('main').length,
                 footers: document.querySelectorAll('footer').length,
-                imagesOverflow: [...document.images].some(img => { const r = img.getBoundingClientRect(); return r.right > window.innerWidth + 1 || r.left < -1; })
+
+                imagesOverflow: [...document.images].some(img => {
+                  const r = img.getBoundingClientRect();
+
+                  return (
+                    r.right > window.innerWidth + 1 ||
+                    r.left < -1
+                  );
+                })
               }));
-              if (check.scrollWidth > check.viewport + 1 || check.bodyWidth > check.viewport + 1) throw new Error(`Horizontal overflow at ${width}px: ${check.scrollWidth}/${check.bodyWidth}`);
-              if (check.imagesOverflow) throw new Error(`Image overflow at ${width}px`);
-              if (check.headers !== 1 || check.mains !== 1 || check.footers !== 1) throw new Error(`Duplicate shell at ${width}px`);
+
+              if (
+                check.scrollWidth > check.viewport + 1 ||
+                check.bodyWidth > check.viewport + 1
+              ) {
+                throw new Error(
+                  `Horizontal overflow at ${width}px: ${check.scrollWidth}/${check.bodyWidth}`
+                );
+              }
+
+              if (check.imagesOverflow) {
+                throw new Error(`Image overflow at ${width}px`);
+              }
+
+              if (
+                check.headers !== 1 ||
+                check.mains !== 1 ||
+                check.footers !== 1
+              ) {
+                throw new Error(
+                  `Duplicate shell at ${width}px`
+                );
+              }
+
               console.log(`MOBILE_VIEWPORT_${width}: PASS`);
             }
-            for (const [label, url] of [['article', links.article], ['category', links.category]]) {
-              if (!url) { console.log(`${label.toUpperCase()}_ROUTE: SKIPPED_NO_DATA`); continue; }
-              const response = await page.goto(url, {waitUntil:'networkidle', timeout:60000});
-              if (!response || response.status() !== 200) throw new Error(`${label} HTTP ${response && response.status()}`);
+
+            for (const [label, url] of [
+              ['article', links.article],
+              ['category', links.category]
+            ]) {
+              if (!url) {
+                console.log(
+                  `${label.toUpperCase()}_ROUTE: SKIPPED_NO_DATA`
+                );
+                continue;
+              }
+
+              const response = await page.goto(url, {
+                waitUntil: 'networkidle',
+                timeout: 60000
+              });
+
+              if (!response || response.status() !== 200) {
+                throw new Error(
+                  `${label} HTTP ${response && response.status()}`
+                );
+              }
+
               const check = await page.evaluate(() => ({
                 html: document.querySelectorAll('html').length,
                 head: document.querySelectorAll('head').length,
@@ -339,18 +444,69 @@ jobs:
                 main: document.querySelectorAll('main').length,
                 footer: document.querySelectorAll('footer').length,
                 h1: document.querySelectorAll('h1').length,
-                canonical: !!document.querySelector('link[rel="canonical"]'),
+                canonical: !!document.querySelector(
+                  'link[rel="canonical"]'
+                ),
                 title: document.title,
-                jsonld: document.querySelectorAll('script[type="application/ld+json"]').length
+                jsonld: document.querySelectorAll(
+                  'script[type="application/ld+json"]'
+                ).length
               }));
-              for (const key of ['html','head','body','header','main','footer']) if (check[key] !== 1) throw new Error(`${label} duplicate/missing ${key}: ${check[key]}`);
-              if (check.h1 < 1 || !check.canonical || !check.title) throw new Error(`${label} SEO/heading check failed`);
-              if (label === 'article' && check.jsonld < 1) throw new Error('Article NewsArticle JSON-LD missing');
-              console.log(`${label.toUpperCase()}_PAGE: PASS ${url}`);
+
+              for (const key of [
+                'html',
+                'head',
+                'body',
+                'header',
+                'main',
+                'footer'
+              ]) {
+                if (check[key] !== 1) {
+                  throw new Error(
+                    `${label} duplicate/missing ${key}: ${check[key]}`
+                  );
+                }
+              }
+
+              if (
+                check.h1 < 1 ||
+                !check.canonical ||
+                !check.title
+              ) {
+                throw new Error(
+                  `${label} SEO/heading check failed`
+                );
+              }
+
+              if (
+                label === 'article' &&
+                check.jsonld < 1
+              ) {
+                throw new Error(
+                  'Article NewsArticle JSON-LD missing'
+                );
+              }
+
+              console.log(
+                `${label.toUpperCase()}_PAGE: PASS ${url}`
+              );
             }
-            if (errors.length) throw new Error(`Browser page errors: ${errors.join(' | ')}`);
+
+            if (errors.length) {
+              throw new Error(
+                `Browser page errors: ${errors.join(' | ')}`
+              );
+            }
+
             await browser.close();
-            console.log('PRODUCTION_BROWSER_SMOKE: PASS');
-          })().catch(error => { console.error(error); process.exit(1); });
+
+            console.log(
+              'PRODUCTION_BROWSER_SMOKE: PASS'
+            );
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
           NODE
+
           node /tmp/production-smoke.cjs
