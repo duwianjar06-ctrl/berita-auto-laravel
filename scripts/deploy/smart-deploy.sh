@@ -58,8 +58,6 @@ printf '%s\n' 'Remote-only deletion: disabled for recovery'
 printf '%s\n' 'Protected production-owned paths: .env, .env.*, storage/**, public/storage/**, public/.user.ini, public/php.ini, public/.well-known/**, .ftpquota, cgi-bin/**'
 printf '%s\n' '================================'
 
-# Build a deployment-only tree from tracked repository files. This prevents
-# Composer/npm/build/test metadata from entering the FTP transfer.
 git archive --format=tar "$GITHUB_SHA" | tar -xf - -C "$STAGE"
 if [[ -d public/build ]]; then
     rm -rf "$STAGE/public/build"
@@ -71,9 +69,6 @@ find "$STAGE" -type f \( -name '.env' -o -name '.env.*' \) -delete
 remote_mkdir "$BASE"
 remote_mkdir "$BASE/.deploy"
 
-# Recovery deliberately overwrites every staged source file, even when the
-# remote size and timestamp appear unchanged. --delete is intentionally absent:
-# hosting/runtime files not managed by Git must remain untouched.
 lftp_common "mirror --reverse --transfer-all --parallel=1 --no-perms --verbose --exclude-glob 'vendor/**' --exclude-glob 'node_modules/**' --exclude-glob 'tests/**' --exclude-glob '.git/**' --exclude-glob '.github/**' --exclude-glob '.env' --exclude-glob '.env.*' --exclude-glob 'storage/**' --exclude-glob 'public/storage/**' --exclude-glob 'cgi-bin/**' --exclude-glob '.deploy/**' --exclude-glob '.phpunit.cache/**' --exclude-glob '.phpunit.result.cache' --exclude-glob '.idea/**' --exclude-glob '.vscode/**' --exclude-glob '.DS_Store' "$STAGE/" \"$BASE\""
 
 VERIFY_FILES=(
@@ -81,6 +76,9 @@ VERIFY_FILES=(
     "app/Models/Article.php"
     "app/Http/Controllers/PublicController.php"
     "resources/views/home.blade.php"
+    "resources/views/article.blade.php"
+    "resources/views/category.blade.php"
+    "resources/views/layouts/app.blade.php"
 )
 for path in "${VERIFY_FILES[@]}"; do
     local_file="$VERIFY_DIR/$(basename "$path")"
