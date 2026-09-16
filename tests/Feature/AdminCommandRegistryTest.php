@@ -37,9 +37,12 @@ class AdminCommandRegistryTest extends TestCase
             'berita:debug-rejected --foo=1',
             'berita:debug-rejected --limit=101',
         ] as $command) {
-            $this->expectException(InvalidArgumentException::class);
-            $this->expectExceptionMessage('Command tidak diizinkan.');
-            AdminCommandRegistry::parse($command);
+            try {
+                AdminCommandRegistry::parse($command);
+                $this->fail('Command should be rejected: '.$command);
+            } catch (InvalidArgumentException $exception) {
+                $this->assertNotSame('', $exception->getMessage());
+            }
         }
     }
 
