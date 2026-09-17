@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Services\AdminConsole\AdminCommandRegistry;
 use Illuminate\Support\Collection;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class ServerConsoleViewTest extends TestCase
@@ -13,7 +14,7 @@ class ServerConsoleViewTest extends TestCase
         $html = view('admin.server-console', [
             'runs' => new Collection(),
             'registry' => AdminCommandRegistry::all(),
-        ])->render();
+        ])->withErrors(new ViewErrorBag())->render();
 
         $this->assertStringContainsString('REMOTE SERVER CONSOLE', $html);
         $this->assertStringContainsString('CUSTOM COMMAND', $html);
